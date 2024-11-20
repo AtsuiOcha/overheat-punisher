@@ -1,8 +1,6 @@
-import pytest
 from unittest import mock
 import numpy as np
-import cv2
-from capture import screen_capture
+from src.capture import screen_capture
 
 # test capture screen function
 def test_capture_screen():

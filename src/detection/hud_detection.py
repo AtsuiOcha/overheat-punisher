@@ -27,3 +27,25 @@ def detect_kill_feed(frame: np.ndarray) -> list:
     # Group into tuples (killer, killed)
     kill_feed = [(text_res[i], text_res[i+1]) for i in range(0, len(text_res), 2)]
     return kill_feed
+
+def check_killed_by(frame: np.ndarray) -> bool:
+    """ detects if the right side of screen contains 'KILLED BY' which indicates
+        player has died during this round.
+    """
+    # region of interest
+    x1, y1 = 1420, 220 # top left
+    x2, y2 = 1900, 800 # bottom right
+    roi = frame[y1:y2, x1:x2]
+
+    gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+
+    # intialize easyOCR reader
+    reader = easyocr.Reader(['en'], gpu=False) # set gpu = True if have gpu
+
+    text_res = reader.readtext(gray_roi, detail=0)
+
+    # check for existance of 'KILLED BY'
+    for text in text_res:
+        if "KILLED BY" in text:
+            return True
+    return False

@@ -8,7 +8,7 @@ BASE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 # test detect kill feed when kill feed contains valid events
 def test_detect_kill_feed1():
     # load test image from assets folder
-    test_image_path = os.path.join(BASE_PATH, 'bind2.png')
+    test_image_path = os.path.join(BASE_PATH, 'kill_feed_death.png')
 
     frame = cv2.imread(test_image_path, cv2.IMREAD_UNCHANGED)
 
@@ -22,3 +22,30 @@ def test_detect_kill_feed1():
     assert len(kill_feed) == 2
     assert kill_feed[0] == ('zlabobabil', 'Iso')
     assert kill_feed[1] == ('igneous rock fan', 'zlabobabil')
+
+# test check killed by exists positive test
+def test_check_killed_by_pos():
+    # load test image from assets folder
+    test_image_path = os.path.join(BASE_PATH, 'kill_feed_death.png')
+
+    frame = cv2.imread(test_image_path, cv2.IMREAD_UNCHANGED)
+
+    if frame.shape[2] == 4:
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+
+    res = hud_detection.check_killed_by(frame)
+    assert res == True
+
+# test check killed by exists negative test
+def test_check_killed_by_neg():
+    # load test image from assets folder
+    test_image_path = os.path.join(BASE_PATH, 'no_kill_feed_no_death.png')
+
+    frame = cv2.imread(test_image_path, cv2.IMREAD_UNCHANGED)
+
+    if frame.shape[2] == 4:
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+
+    res = hud_detection.check_killed_by(frame)
+    assert res == False
+

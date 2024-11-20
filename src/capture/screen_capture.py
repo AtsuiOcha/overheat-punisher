@@ -1,6 +1,17 @@
-import mss
 import cv2
+import logging
+import mss
 import numpy as np
+
+# Check if a root logger is already configured
+if not logging.getLogger().hasHandlers():
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+
+# Create a logger for this specific module
+logger = logging.getLogger(__name__)
 
 def capture_screen():
     """Captures a single frame from the primary monitor"""

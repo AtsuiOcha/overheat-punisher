@@ -1,7 +1,7 @@
 import cv2
 
 # load image
-image_path = "../assets/valorant_sc.jpg" # please change this asset path if you want to explore new image
+image_path = "../assets/mid_round.png" # please change this asset path if you want to explore new image
 image = cv2.imread(image_path)
 
 # global variables

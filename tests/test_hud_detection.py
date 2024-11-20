@@ -49,3 +49,20 @@ def test_check_killed_by_neg():
     res = hud_detection.check_killed_by(frame)
     assert res == False
 
+# test round info detection
+def test_detect_round_info():
+    # load test image from assets folder
+    test_image_path = os.path.join(BASE_PATH, 'mid_round.png')
+
+    frame = cv2.imread(test_image_path, cv2.IMREAD_UNCHANGED)
+
+    if frame.shape[2] == 4:
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+
+    round_info = hud_detection.detect_round_info(frame)
+
+    # assert round_info = (cur_round, round_time_sec, score)
+    assert len(round_info) == 3
+    assert round_info[0] == 15
+    assert round_info[1] == 95
+    assert round_info[2] == '8 - 6'

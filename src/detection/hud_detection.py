@@ -1,6 +1,17 @@
+import logging
 import cv2
 import easyocr
 import numpy as np
+
+# Check if a root logger is already configured
+if not logging.getLogger().hasHandlers():
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+
+# Create a logger for this specific module
+logger = logging.getLogger(__name__)
 
 def detect_kill_feed(frame: np.ndarray) -> list:
     """ detects kill feed events from the provided game frame
@@ -16,7 +27,6 @@ def detect_kill_feed(frame: np.ndarray) -> list:
     # intialize easyOCR reader
     reader = easyocr.Reader(['en'], gpu=False) # set gpu = True if have gpu
 
-    # TODO(bayunco): determine what the other detail
     # values are maybe it can help us split guns
     text_res = reader.readtext(gray_roi, detail=0) # detail=0 means only text
 

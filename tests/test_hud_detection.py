@@ -3,7 +3,7 @@ import cv2
 from src.detection import hud_detection
 
 # asset base path
-BASE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src', 'assets')
+BASE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src', 'assets', 'game_scenarios')
 
 # test detect kill feed when kill feed contains valid events
 def test_detect_kill_feed1():
@@ -39,7 +39,7 @@ def test_check_killed_by_pos():
 # test check killed by exists negative test
 def test_check_killed_by_neg():
     # load test image from assets folder
-    test_image_path = os.path.join(BASE_PATH, 'no_kill_feed_no_death.png')
+    test_image_path = os.path.join(BASE_PATH, 'mid_round.png')
 
     frame = cv2.imread(test_image_path, cv2.IMREAD_UNCHANGED)
 
@@ -66,3 +66,37 @@ def test_detect_round_info():
     assert round_info[0] == 15
     assert round_info[1] == 95
     assert round_info[2] == '8 - 6'
+
+# test team agent detection with deaths
+def test_agent_detection_with_deaths():
+    # load test image from assets folder
+    test_image_path = os.path.join(BASE_PATH, 'kill_feed_death.png')
+
+    frame = cv2.imread(test_image_path, cv2.IMREAD_UNCHANGED)
+
+    if frame.shape[2] == 4:
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+
+    ret = hud_detection.detect_agent_icons(frame)
+
+    assert ret[0] == ['cypher', 'skye']
+    assert ret[1] == ['chamber', 'clove', 'raze', 'skye']
+    assert len(ret[0]) == 2
+    assert len(ret[1]) == 4
+
+# test team agent detection no deaths
+def test_agent_detection_no_deaths():
+    # load test image from assets folder
+    test_image_path = os.path.join(BASE_PATH, 'mid_round.png')
+
+    frame = cv2.imread(test_image_path, cv2.IMREAD_UNCHANGED)
+
+    if frame.shape[2] == 4:
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+
+    ret = hud_detection.detect_agent_icons(frame)
+
+    assert ret[0] == sorted(['clove', 'neon', 'killjoy', 'reyna', 'jett'])
+    assert ret[1] == sorted(['clove', 'jett', 'sova', 'cypher', 'reyna'])
+    assert len(ret[0]) == 5
+    assert len(ret[1]) == 5

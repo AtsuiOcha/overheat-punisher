@@ -2,6 +2,7 @@ import logging
 import cv2
 import easyocr
 import numpy as np
+import os
 
 # Check if a root logger is already configured
 if not logging.getLogger().hasHandlers():
@@ -12,6 +13,9 @@ if not logging.getLogger().hasHandlers():
 
 # Create a logger for this specific module
 logger = logging.getLogger(__name__)
+
+VARIANCE_THRESHOLD = 800
+MATCH_THRESHOLD = 0.9
 
 def detect_kill_feed(frame: np.ndarray) -> list:
     """ detects kill feed events from the provided game frame
@@ -89,7 +93,7 @@ def detect_round_info(frame: np.ndarray) -> bool:
     reader = easyocr.Reader(['en'], gpu=False) # set gpu = True if have gpu
 
     text_res = reader.readtext(gray_roi, detail=0)
-    logging.info("round info text_res= ", text_res)
+    logging.info("round info text_res= %s", text_res)
 
     if len(text_res) == 3:
         round_time = fix_ocr_time_format(text_res[1])
@@ -98,5 +102,125 @@ def detect_round_info(frame: np.ndarray) -> bool:
 
         return (cur_round, round_time, score)
     else:
-        logging.error("round info reader detected invalid hud format: ", text_res)
+        logging.error("round info reader detected invalid hud format: %s", text_res)
         return None
+
+def detect_agent_icons(frame: np.ndarray) -> tuple:
+    """ given a frame during game will return a 2d array with the characters on each team
+
+        output: [[agent_t1, agent2_t1, ...], [agent_t2, agent2_t2, ...]]
+    """
+    #TODO(bayunco): will using os.path cause issue in packaging this up as application for other pcs?
+    # Adjust the assets_folder path to go up from detection and then down to assets
+    assets_folder = os.path.join(os.path.dirname(__file__), '../assets/agent_icons_clean')
+    # Normalize path to handle cross-platform issues
+    assets_folder = os.path.abspath(assets_folder)
+
+    # convert frame to grayscale
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # team 1
+    team1_agents = []
+
+    # intial ROI
+    x1, y1 = 435, 30 # top left
+    x2, y2 = 500, 80 # bottom right
+
+    for _ in range(5):
+        roi = gray_frame[y1:y2, x1:x2]
+        # handle empty ROI (dead agents)
+        if np.var(roi) < VARIANCE_THRESHOLD:
+            roi_str = f"Top-left({x1}, {y1}) Bottom-right({x2}, {y2})"
+            logger.info('variance: %s is too low, empty ROI: %s found', np.var(roi), roi_str)
+            x1 += 65
+            x2 += 65
+            continue
+
+        ret_agent = ""
+        ret_threshold = 0
+        for filename in os.listdir(assets_folder):
+            if filename.endswith('.png'):
+                is_mirrored = filename.startswith('Mirrored_')
+
+                if is_mirrored:
+                    continue
+
+                # load agent icon and get agent name
+                agent_name = filename.replace('Mirrored_', '').replace('_icon.png','')
+                agent_template = cv2.imread(os.path.join(assets_folder, filename), cv2.IMREAD_UNCHANGED)
+
+                # random masking to avoid the background of template influencing match
+                agent_template, alpha = agent_template[:, :, :3], agent_template[:, :, 3]
+                agent_template = cv2.cvtColor(agent_template, cv2.COLOR_BGR2GRAY)
+                mask = alpha
+
+                # template match
+                result = cv2.matchTemplate(roi, agent_template, cv2.TM_CCORR_NORMED, mask=mask)
+                loc = np.where(result >= MATCH_THRESHOLD)
+                # update max match
+                if loc[0].size > 0:
+                    max_val = np.max(result)
+                    if max_val >= MATCH_THRESHOLD:
+                        if max_val > ret_threshold:
+                            ret_threshold = max_val
+                            ret_agent = agent_name
+        logger.info('adding agent: %s to team1, with %s confidence',
+                    ret_agent, ret_threshold)
+        team1_agents.append(ret_agent.lower())
+        x1 += 65
+        x2 += 65
+
+     # team 2
+    team2_agents = []
+
+    # intial ROI
+    x1, y1 = 1423, 30 # top left
+    x2, y2 = 1488, 80 # bottom right
+
+    for x in range(5):
+        roi = gray_frame[y1:y2, x1:x2]
+        # handle empty ROI (dead agents)
+        if np.var(roi) < VARIANCE_THRESHOLD:
+            roi_str = f"ROI: Top-left({x1}, {y1}) Bottom-right({x2}, {y2})"
+            logger.info('variance: %s is too low, empty ROI: %s found', np.var(roi), roi_str)
+            x1 -= 65
+            x2 -= 65
+            continue
+
+        ret_agent = ""
+        ret_threshold = 0
+        for filename in os.listdir(assets_folder):
+            if filename.endswith('.png'):
+                is_mirrored = filename.startswith('Mirrored_')
+
+                if not is_mirrored:
+                    continue
+
+                # load agent icon and get agent name
+                agent_name = filename.replace('Mirrored_', '').replace('_icon.png','')
+                agent_template = cv2.imread(os.path.join(assets_folder, filename), cv2.IMREAD_UNCHANGED)
+
+                # random masking to avoid the background of template influencing match
+                agent_template, alpha = agent_template[:, :, :3], agent_template[:, :, 3]
+                agent_template = cv2.cvtColor(agent_template, cv2.COLOR_BGR2GRAY)
+                mask = alpha
+
+                # template match
+                result = cv2.matchTemplate(roi, agent_template, cv2.TM_CCORR_NORMED, mask=mask)
+                loc = np.where(result >= MATCH_THRESHOLD)
+
+                # update max match
+                if loc[0].size > 0:
+                    max_val = np.max(result)
+                    if max_val >= MATCH_THRESHOLD:
+                        if max_val > ret_threshold:
+                            ret_threshold = max_val
+                            ret_agent = agent_name
+        logger.info('adding agent: %s to team2, with %s confidence',
+                    ret_agent, ret_threshold)
+        team2_agents.append(ret_agent.lower())
+        x1 -= 65
+        x2 -= 65
+
+    # sort the agents for easier testing
+    return (sorted(team1_agents), sorted(team2_agents))

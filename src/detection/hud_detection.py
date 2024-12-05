@@ -177,11 +177,11 @@ def detect_agent_icons(frame: np.ndarray) -> tuple:
     x1, y1 = 1423, 30 # top left
     x2, y2 = 1488, 80 # bottom right
 
-    for x in range(5):
+    for _ in range(5):
         roi = gray_frame[y1:y2, x1:x2]
         # handle empty ROI (dead agents)
         if np.var(roi) < VARIANCE_THRESHOLD:
-            roi_str = f"ROI: Top-left({x1}, {y1}) Bottom-right({x2}, {y2})"
+            roi_str = f"Top-left({x1}, {y1}) Bottom-right({x2}, {y2})"
             logger.info('variance: %s is too low, empty ROI: %s found', np.var(roi), roi_str)
             x1 -= 65
             x2 -= 65

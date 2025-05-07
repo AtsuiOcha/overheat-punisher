@@ -2,3 +2,4 @@ venv/
 *.pyc
 *.pyo
 .DS_Store
+.python-version

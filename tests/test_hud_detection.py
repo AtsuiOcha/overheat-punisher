@@ -1,20 +1,25 @@
-import os
+from importlib.resources import files
+
 import cv2
+import numpy as np
+import pytest
+
+from src.assets import game_scenarios
 from src.detection import hud_detection
 
-# asset base path
-BASE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src', 'assets', 'game_scenarios')
 
 # test detect kill feed when kill feed contains valid events
 @pytest.mark.unit
 def test_detect_kill_feed1() -> None:
     # load test image from assets folder
-    test_image_path = os.path.join(BASE_PATH, 'kill_feed_death.png')
+    test_img = files(game_scenarios).joinpath("kill_feed_death.png")
 
-    frame = cv2.imread(test_image_path, cv2.IMREAD_UNCHANGED)
+    with test_img.open("rb") as img_file:
+        frame = cv2.imdecode(
+            np.frombuffer(img_file.read(), np.uint8), cv2.IMREAD_UNCHANGED
+        )
 
     if frame.shape[2] == 4:
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
         frame = cv2.cvtColor(src=frame, code=cv2.COLOR_BGRA2BGR)
 
     kill_feed = hud_detection.detect_kill_feed(frame)
@@ -30,9 +35,12 @@ def test_detect_kill_feed1() -> None:
 @pytest.mark.unit
 def test_check_killed_by_pos():
     # load test image from assets folder
-    test_image_path = os.path.join(BASE_PATH, 'kill_feed_death.png')
+    test_img = files(game_scenarios).joinpath("kill_feed_death.png")
 
-    frame = cv2.imread(test_image_path, cv2.IMREAD_UNCHANGED)
+    with test_img.open("rb") as img_file:
+        frame = cv2.imdecode(
+            np.frombuffer(img_file.read(), np.uint8), cv2.IMREAD_UNCHANGED
+        )
 
     if frame.shape[2] == 4:
         frame = cv2.cvtColor(src=frame, code=cv2.COLOR_BGRA2BGR)
@@ -44,9 +52,12 @@ def test_check_killed_by_pos():
 # test check killed by exists negative test
 def test_check_killed_by_neg():
     # load test image from assets folder
-    test_image_path = os.path.join(BASE_PATH, 'mid_round.png')
+    test_img = files(game_scenarios).joinpath("mid_round.png")
 
-    frame = cv2.imread(test_image_path, cv2.IMREAD_UNCHANGED)
+    with test_img.open("rb") as img_file:
+        frame = cv2.imdecode(
+            np.frombuffer(img_file.read(), np.uint8), cv2.IMREAD_UNCHANGED
+        )
 
     if frame.shape[2] == 4:
         frame = cv2.cvtColor(src=frame, code=cv2.COLOR_BGRA2BGR)
@@ -58,9 +69,12 @@ def test_check_killed_by_neg():
 # test round info detection
 def test_detect_round_info():
     # load test image from assets folder
-    test_image_path = os.path.join(BASE_PATH, 'mid_round.png')
+    test_img = files(game_scenarios).joinpath("mid_round.png")
 
-    frame = cv2.imread(test_image_path, cv2.IMREAD_UNCHANGED)
+    with test_img.open("rb") as img_file:
+        frame = cv2.imdecode(
+            np.frombuffer(img_file.read(), np.uint8), cv2.IMREAD_UNCHANGED
+        )
 
     if frame.shape[2] == 4:
         frame = cv2.cvtColor(src=frame, code=cv2.COLOR_BGRA2BGR)
@@ -79,9 +93,12 @@ def test_detect_round_info():
 # test team agent detection with deaths
 def test_agent_detection_with_deaths():
     # load test image from assets folder
-    test_image_path = os.path.join(BASE_PATH, 'kill_feed_death.png')
+    test_img = files(game_scenarios).joinpath("kill_feed_death.png")
 
-    frame = cv2.imread(test_image_path, cv2.IMREAD_UNCHANGED)
+    with test_img.open("rb") as img_file:
+        frame = cv2.imdecode(
+            np.frombuffer(img_file.read(), np.uint8), cv2.IMREAD_UNCHANGED
+        )
 
     if frame.shape[2] == 4:
         frame = cv2.cvtColor(src=frame, code=cv2.COLOR_BGRA2BGR)
@@ -98,9 +115,11 @@ def test_agent_detection_with_deaths():
 # test team agent detection no deaths
 def test_agent_detection_no_deaths():
     # load test image from assets folder
-    test_image_path = os.path.join(BASE_PATH, 'mid_round.png')
+    test_img = files(game_scenarios).joinpath("mid_round.png")
 
-    frame = cv2.imread(test_image_path, cv2.IMREAD_UNCHANGED)
+    with test_img.open("rb") as img_file:
+        frame = cv2.imdecode(
+            np.frombuffer(img_file.read(), np.uint8), cv2.IMREAD_UNCHANGED
         )
 
     if frame.shape[2] == 4:

@@ -6,3 +6,7 @@ venv/
 
 # version
 _version.py
+
+# Distribution / packaging
+.Python
+*.egg-info

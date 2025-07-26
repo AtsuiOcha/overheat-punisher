@@ -33,7 +33,7 @@ def test_check_killed_by_pos():
     if frame.shape[2] == 4:
         frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
 
-    res = hud_detection.check_killed_by(frame)
+    res = hud_detection.is_player_dead(frame)
     assert res == True
 
 # test check killed by exists negative test
@@ -46,7 +46,7 @@ def test_check_killed_by_neg():
     if frame.shape[2] == 4:
         frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
 
-    res = hud_detection.check_killed_by(frame)
+    res = hud_detection.is_player_dead(frame)
     assert res == False
 
 # test round info detection

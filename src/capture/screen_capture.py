@@ -13,7 +13,7 @@ def capture_screen() -> MatLike:
             monitor
         )  # implemented using C/C++ so only accepts positional arguments
 
-        return cv2.cvtColor(np.array(screenshot), cv2.COLOR_BGRA2BGR)
+        return cv2.cvtColor(src=np.array(screenshot), code=cv2.COLOR_BGRA2BGR)
 
 
 def show_screen_capture() -> None:

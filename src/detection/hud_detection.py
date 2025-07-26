@@ -1,19 +1,10 @@
-import logging
 import os
 
 import cv2
 import easyocr
 import numpy as np
+from loguru import logger
 
-# Check if a root logger is already configured
-if not logging.getLogger().hasHandlers():
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-
-# Create a logger for this specific module
-logger = logging.getLogger(__name__)
 
 VARIANCE_THRESHOLD = 800
 MATCH_THRESHOLD = 0.9
@@ -148,9 +139,7 @@ def detect_agent_icons(frame: np.ndarray) -> tuple:
         # handle empty ROI (dead agents)
         if np.var(roi) < VARIANCE_THRESHOLD:
             roi_str = f"Top-left({x1}, {y1}) Bottom-right({x2}, {y2})"
-            logger.info(
-                "variance: %s is too low, empty ROI: %s found", np.var(roi), roi_str
-            )
+            logger.info(f"variance: {np.var(roi)} is too low, empty ROI: {roi_str}")
             x1 += 65
             x2 += 65
             continue
@@ -190,9 +179,7 @@ def detect_agent_icons(frame: np.ndarray) -> tuple:
                         if max_val > ret_threshold:
                             ret_threshold = max_val
                             ret_agent = agent_name
-        logger.info(
-            "adding agent: %s to team1, with %s confidence", ret_agent, ret_threshold
-        )
+        logger.info(f"{ret_agent=} added to team1, with {ret_threshold=}")
         team1_agents.append(ret_agent.lower())
         x1 += 65
         x2 += 65
@@ -209,9 +196,7 @@ def detect_agent_icons(frame: np.ndarray) -> tuple:
         # handle empty ROI (dead agents)
         if np.var(roi) < VARIANCE_THRESHOLD:
             roi_str = f"Top-left({x1}, {y1}) Bottom-right({x2}, {y2})"
-            logger.info(
-                "variance: %s is too low, empty ROI: %s found", np.var(roi), roi_str
-            )
+            logger.info(f"variance: {np.var(roi)} is too low, empty ROI: {roi_str}")
             x1 -= 65
             x2 -= 65
             continue
@@ -252,9 +237,8 @@ def detect_agent_icons(frame: np.ndarray) -> tuple:
                         if max_val > ret_threshold:
                             ret_threshold = max_val
                             ret_agent = agent_name
-        logger.info(
-            "adding agent: %s to team2, with %s confidence", ret_agent, ret_threshold
-        )
+
+        logger.info(f"{ret_agent=} added to team2, with {ret_threshold=}")
         team2_agents.append(ret_agent.lower())
         x1 -= 65
         x2 -= 65

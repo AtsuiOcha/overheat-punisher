@@ -396,8 +396,7 @@ wheels = [
 
 [[package]]
 name = "overheat-punisher"
-version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "easyocr" },
     { name = "filelock" },

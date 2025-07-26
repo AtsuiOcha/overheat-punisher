@@ -1,7 +1,8 @@
 [project]
 name = "overheat-punisher"
-version = "0.1.0"
+dynamic = ["version"]
 description = "hispanic parenting simulator when I do stupid plays in valorant"
+authors = [{name= "Oskar Hernandez", email= "oskadez@gmail.com"}]
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -41,3 +42,22 @@ dev = [
     "pytest==8.3.3",
 ]
 
+[tool.pytest.ini_options]
+markers = [
+  "unit: Mark a test as unit test"
+]
+log_cli = true
+log_cli_level = "DEBUG"
+
+[build-system]
+requires = ["hatchling", "uv-dynamic-versioning"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.hatch.build.hooks.version]
+path = "src/_version.py"
+template = '''
+version = "{version}"
+'''

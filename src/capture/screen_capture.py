@@ -1,18 +1,7 @@
-import logging
-
 import cv2
 import mss
 import numpy as np
-
-# Check if a root logger is already configured
-if not logging.getLogger().hasHandlers():
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-
-# Create a logger for this specific module
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 
 def capture_screen():
@@ -35,6 +24,7 @@ def show_screen_capture():
 
         # Display the frame in a window
         cv2.imshow("Screen Capture", frame)
+            logger.info("Starting screen capture loop...")
 
         # exit on '~' key press for "leave"
         if cv2.waitKey(1) & 0xFF == ord("~"):
@@ -42,4 +32,6 @@ def show_screen_capture():
 
     # release resources
     cv2.destroyAllWindows()
+                logger.info("Exit key pressed. Stopping capture.")
 
+        logger.error(f"Unexpected error in show_screen_capture {cv2_err}")

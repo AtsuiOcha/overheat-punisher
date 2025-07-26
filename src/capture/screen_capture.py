@@ -1,5 +1,6 @@
-import cv2
 import logging
+
+import cv2
 import mss
 import numpy as np
 
@@ -7,11 +8,12 @@ import numpy as np
 if not logging.getLogger().hasHandlers():
     logging.basicConfig(
         level=logging.DEBUG,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
 # Create a logger for this specific module
 logger = logging.getLogger(__name__)
+
 
 def capture_screen():
     """Captures a single frame from the primary monitor"""
@@ -25,20 +27,19 @@ def capture_screen():
 
         return frame
 
+
 def show_screen_capture():
     """Continuously captures and displays the screen until '~' is pressed."""
-    with mss.mss() as sct:
-        monitor = sct.monitors[1]
+    while True:
+        frame = capture_screen()
 
-        while True:
-            frame = capture_screen()
+        # Display the frame in a window
+        cv2.imshow("Screen Capture", frame)
 
-            # Display the frame in a window
-            cv2.imshow('Screen Capture', frame)
+        # exit on '~' key press for "leave"
+        if cv2.waitKey(1) & 0xFF == ord("~"):
+            break
 
-            # exit on '~' key press for "leave"
-            if cv2.waitKey(1) & 0xFF == ord('~'):
-                break
+    # release resources
+    cv2.destroyAllWindows()
 
-        # release resources
-        cv2.destroyAllWindows()

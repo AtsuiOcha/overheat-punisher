@@ -1,4 +1,4 @@
-import os
+from importlib.resources import files
 from typing import Any, cast
 
 import cv2
@@ -7,6 +7,7 @@ import numpy as np
 from cv2.typing import MatLike
 from loguru import logger
 
+import src.assets.agent_icons_clean as icons
 
 VARIANCE_THRESHOLD = 800
 MATCH_THRESHOLD = 0.9
@@ -115,13 +116,7 @@ def detect_agent_icons(frame: MatLike) -> tuple[list[str], list[str]]:
 
     output: [[agent_t1, agent2_t1, ...], [agent_t2, agent2_t2, ...]]
     """
-    # TODO(bayunco): will using os.path cause issue in packaging this up as application for other pcs?
-    # Adjust the assets_folder path to go up from detection and then down to assets
-    assets_folder = os.path.join(
-        os.path.dirname(__file__), "../assets/agent_icons_clean"
-    )
-    # Normalize path to handle cross-platform issues
-    assets_folder = os.path.abspath(assets_folder)
+    assets_folder = files(icons)
 
     # convert frame to grayscale
     gray_frame = cv2.cvtColor(src=frame, code=cv2.COLOR_BGR2GRAY)
@@ -145,18 +140,25 @@ def detect_agent_icons(frame: MatLike) -> tuple[list[str], list[str]]:
 
         ret_agent = ""
         ret_threshold = 0
-        for filename in os.listdir(assets_folder):
-            if filename.endswith(".png"):
-                is_mirrored = filename.startswith("Mirrored_")
+        for path in assets_folder.iterdir():
+            if path.name.endswith(".png"):
+                is_mirrored = path.name.startswith("Mirrored_")
 
                 if is_mirrored:
                     continue
 
                 # load agent icon and get agent name
-                agent_name = filename.replace("Mirrored_", "").replace("_icon.png", "")
-                agent_template = cv2.imread(
-                    os.path.join(assets_folder, filename), cv2.IMREAD_UNCHANGED
-                )
+                agent_name = path.name.replace("Mirrored_", "").replace("_icon.png", "")
+                try:
+                    # load template using imdecode
+                    with path.open("rb") as template_file:
+                        agent_template = cv2.imdecode(
+                            buf=np.frombuffer(template_file.read(), np.uint8),
+                            flags=cv2.IMREAD_UNCHANGED,
+                        )
+                except Exception as error:
+                    logger.error(f"Error loading {agent_name} template {error=}")
+                    continue
 
                 # random masking to avoid the background of template influencing match
                 agent_template, alpha = (
@@ -207,18 +209,25 @@ def detect_agent_icons(frame: MatLike) -> tuple[list[str], list[str]]:
 
         ret_agent = ""
         ret_threshold = 0
-        for filename in os.listdir(assets_folder):
-            if filename.endswith(".png"):
-                is_mirrored = filename.startswith("Mirrored_")
+        for path in assets_folder.iterdir():
+            if path.name.endswith(".png"):
+                is_mirrored = path.name.startswith("Mirrored_")
 
                 if not is_mirrored:
                     continue
 
                 # load agent icon and get agent name
-                agent_name = filename.replace("Mirrored_", "").replace("_icon.png", "")
-                agent_template = cv2.imread(
-                    os.path.join(assets_folder, filename), cv2.IMREAD_UNCHANGED
-                )
+                agent_name = path.name.replace("Mirrored_", "").replace("_icon.png", "")
+                try:
+                    # load template using imdecode
+                    with path.open("rb") as template_file:
+                        agent_template = cv2.imdecode(
+                            buf=np.frombuffer(template_file.read(), np.uint8),
+                            flags=cv2.IMREAD_UNCHANGED,
+                        )
+                except Exception as error:
+                    logger.error(f"Error loading {agent_name} template {error=}")
+                    continue
 
                 # random masking to avoid the background of template influencing match
                 agent_template, alpha = (

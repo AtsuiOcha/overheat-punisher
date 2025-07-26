@@ -4,6 +4,8 @@ import easyocr
 import numpy as np
 import os
 
+from typing import Sequence
+
 # Check if a root logger is already configured
 if not logging.getLogger().hasHandlers():
     logging.basicConfig(
@@ -42,9 +44,14 @@ def detect_kill_feed(frame: np.ndarray) -> list:
     kill_feed = [(text_res[i], text_res[i+1]) for i in range(0, len(text_res), 2)]
     return kill_feed
 
-def check_killed_by(frame: np.ndarray) -> bool:
-    """ detects if the right side of screen contains 'KILLED BY' which indicates
-        player has died during this round.
+def is_player_dead(frame: np.ndarray) -> bool:
+    """ detects if player is dead.
+
+    Args:
+        frame (np.ndarray) current frame capture of gameplay
+
+    Returns:
+        bool: True if player is dead, False otherwise
     """
     # region of interest
     x1, y1 = 1420, 220 # top left
@@ -64,11 +71,16 @@ def check_killed_by(frame: np.ndarray) -> bool:
             return True
     return False
 
-def detect_round_info(frame: np.ndarray) -> bool:
-    """ detects if the right side of screen contains 'KILLED BY' which indicates
-        player has died during this round.
+def detect_round_info(frame: np.ndarray) -> tuple | None:
+    """detects game state information from UI components
+
+    Args:
+        frame (np.ndarray): current frame capture of the gameplay
+
+    Returns:
+        tuple: (current_round, round_time, current_score) or None
     """
-    def fix_ocr_time_format(time_str: str) -> str:
+    def fix_ocr_time_format(time_str: str) -> int:
         """Converts a time string in 'minutes.seconds' format to total seconds"""
         # If the string contains a dot, try to treat it as a colon
         if '.' in time_str:
@@ -96,8 +108,8 @@ def detect_round_info(frame: np.ndarray) -> bool:
     logging.info("round info text_res= %s", text_res)
 
     if len(text_res) == 3:
-        round_time = fix_ocr_time_format(text_res[1])
-        cur_round = int(text_res[0]) + int(text_res[2]) + 1
+        round_time = fix_ocr_time_format(str(text_res[1]))
+        cur_round = int(text_res[0]) + int(text_res[2]) + 1 # type: ignore
         score = f"{text_res[0]} - {text_res[2]}"
 
         return (cur_round, round_time, score)

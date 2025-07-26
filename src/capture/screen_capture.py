@@ -1,37 +1,37 @@
 import cv2
 import mss
 import numpy as np
+from cv2.typing import MatLike
 from loguru import logger
 
 
-def capture_screen():
+def capture_screen() -> MatLike:
     """Captures a single frame from the primary monitor"""
     with mss.mss() as sct:
         monitor = sct.monitors[1]
-        screenshot = sct.grab(monitor)
+        screenshot = sct.grab(
+            monitor
+        )  # implemented using C/C++ so only accepts positional arguments
 
-        # convert the image to a numpy array in OpenCV BGR format
-        frame = np.array(screenshot)
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
-
-        return frame
+        return cv2.cvtColor(np.array(screenshot), cv2.COLOR_BGRA2BGR)
 
 
-def show_screen_capture():
+def show_screen_capture() -> None:
     """Continuously captures and displays the screen until '~' is pressed."""
-    while True:
-        frame = capture_screen()
-
-        # Display the frame in a window
-        cv2.imshow("Screen Capture", frame)
+    try:
+        while True:
             logger.info("Starting screen capture loop...")
+            frame = capture_screen()
 
-        # exit on '~' key press for "leave"
-        if cv2.waitKey(1) & 0xFF == ord("~"):
-            break
+            # Display the frame in a window
+            cv2.imshow(winname="Screen Capture", mat=frame)
 
-    # release resources
-    cv2.destroyAllWindows()
+            # exit on '~' key press for "leave"
+            if cv2.waitKey(delay=1) & 0xFF == ord("~"):
                 logger.info("Exit key pressed. Stopping capture.")
+                break
 
+        # release resources
+        cv2.destroyAllWindows()
+    except Exception as cv2_err:
         logger.error(f"Unexpected error in show_screen_capture {cv2_err}")

@@ -3,3 +3,10 @@ venv/
 *.pyo
 .DS_Store
 .python-version
+
+# version
+_version.py
+
+# Distribution / packaging
+.Python
+*.egg-info

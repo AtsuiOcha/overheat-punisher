@@ -1,5 +1,4 @@
 from importlib.resources import files
-from typing import Any
 
 import cv2
 import numpy as np
@@ -10,7 +9,7 @@ from src.assets import game_scenarios
 start_x, start_y = None, None
 
 
-def get_coords(event: int, x: int, y: int, flags: int, param: Any) -> None:
+def get_coords(event: int, x: int, y: int, _flags: int, _param: object) -> None:
     global start_x, start_y
     if event == cv2.EVENT_LBUTTONDOWN:
         start_x, start_y = x, y
@@ -30,10 +29,9 @@ def main():
     cv2.namedWindow("Screenshot")
     cv2.setMouseCallback("Screenshot", get_coords)
     cv2.imshow("Screenshot", image)
-    cv2.waitKey(0)
+    _ = cv2.waitKey(0)
     cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
     main()
-

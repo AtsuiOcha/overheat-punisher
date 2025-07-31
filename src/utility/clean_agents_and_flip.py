@@ -5,7 +5,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 
-def process_agent_icons() -> None:
+def process_agent_icons() -> bool:
     """Process transparent agent icons: grayscale, resize, and mirror."""
     PROJECT_ROOT = Path(__file__).parent.parent
     RAW_DIR = PROJECT_ROOT / "assets" / "agent_icons_raw"
@@ -70,6 +70,5 @@ def standardize_image(img: NDArray[np.uint8]) -> NDArray[np.uint8]:
 
 if __name__ == "__main__":
     print("🔄 Processing agent icons...")
-    process_agent_icons()
-    print("✨ All done!")
+    print("✨ All done!") if process_agent_icons() else print("❌ Failure!")
 

@@ -1,46 +1,70 @@
+from pathlib import Path
+
 import cv2
-import os
+import numpy as np
 
-def process_and_mirror_images(input_folder, output_folder):
-    for filename in os.listdir(input_folder):
-        if filename.endswith(".webp"):
-            filepath = os.path.join(input_folder, filename)
 
-            # Read and convert to grayscale
-            img = cv2.imread(filepath, cv2.IMREAD_UNCHANGED)
+def process_agent_icons() -> None:
+    """Process transparent agent icons: grayscale, resize, and mirror."""
+    PROJECT_ROOT = Path(__file__).parent.parent
+    RAW_DIR = PROJECT_ROOT / "assets" / "agent_icons_raw"
+    CLEAN_DIR = PROJECT_ROOT / "assets" / "agent_icons_clean"
 
-            if img.shape[2] == 4:
-                # split the image into BGR and alpha channels
-                bgr = img[:, :, :3]
-                alpha = img[:, :, 3]
-                gray_bgr = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-                gray_img = cv2.merge([gray_bgr, gray_bgr, gray_bgr, alpha])
-            else:
-                gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # Ensure output directory and its __init__.py exist
+    CLEAN_DIR.mkdir(parents=True, exist_ok=True)
+    (RAW_DIR / "__init__.py").touch(exist_ok=True)
+    (CLEAN_DIR / "__init__.py").touch(exist_ok=True)
 
-            # resize to (40 x 40 px) how big they show up on screen
-            resized_gray_img = cv2.resize(gray_img, (40, 40), interpolation=cv2.INTER_AREA)
+    if not RAW_DIR.exists():
+        print(f"❌ Raw icons directory not found at {RAW_DIR}")
+        return
 
-            # convert to png format
-            png_filename = filename.replace('.webp', '.png')
+    existing_clean = {f.name for f in CLEAN_DIR.glob("*.webp")}
 
-            # Save the resized grayscale image as png
-            cleaned_filepath = os.path.join(output_folder, png_filename)
-            cv2.imwrite(cleaned_filepath, resized_gray_img)
+    for img_path in RAW_DIR.glob("*.webp"):
+        base_name = img_path.name
+        mirrored_name = f"Mirrored_{base_name}"
 
-            # Mirror the cleaned image along the Y-axis
-            mirrored_img = cv2.flip(resized_gray_img, 1)
+        if base_name in existing_clean and mirrored_name in existing_clean:
+            print(f"⏩ Already exists: {base_name} (skipped)")
+            continue
 
-            # Save the mirrored image
-            mirrored_filename = f"Mirrored_{png_filename}"
-            mirrored_filepath = os.path.join(output_folder, mirrored_filename)
-            cv2.imwrite(mirrored_filepath, mirrored_img)
+        img = cv2.imread(str(img_path), cv2.IMREAD_UNCHANGED)
+        if img is None or img.shape[2] != 4:
+            print(f"⚠️ Failed to load or invalid format: {img_path.name}")
+            continue
 
-            # Remove the original input image
-            os.remove(filepath)
+        # Process original
+        processed = standardize_image(img)
+        if base_name not in existing_clean:
+            cv2.imwrite(
+                str(CLEAN_DIR / base_name), processed, [cv2.IMWRITE_WEBP_QUALITY, 90]
+            )
+            print(f"✅ Created: {base_name}")
 
-# Define your input and output paths
-input_folder = "../assets/agent_icons"
-output_folder = "../assets/agent_icons_clean"
+        # Process mirrored
+        if mirrored_name not in existing_clean:
+            mirrored = cv2.flip(processed, 1)
+            cv2.imwrite(
+                str(CLEAN_DIR / mirrored_name), mirrored, [cv2.IMWRITE_WEBP_QUALITY, 90]
+            )
+            print(f"✅ Created: {mirrored_name}")
 
-process_and_mirror_images(input_folder, output_folder)
+
+def standardize_image(img: np.ndarray) -> np.ndarray:
+    """Convert to grayscale while preserving alpha, then resize to 40x40."""
+    bgr = img[:, :, :3]
+    alpha = img[:, :, 3]
+
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+    gray_rgb = cv2.merge([gray, gray, gray])
+    result = cv2.merge([gray_rgb, alpha])
+
+    return cv2.resize(result, (40, 40), interpolation=cv2.INTER_AREA)
+
+
+if __name__ == "__main__":
+    print("🔄 Processing agent icons...")
+    process_agent_icons()
+    print("✨ All done!")
+

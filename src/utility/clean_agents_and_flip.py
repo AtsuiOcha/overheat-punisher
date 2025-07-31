@@ -2,6 +2,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+from numpy.typing import NDArray
 
 
 def process_agent_icons() -> None:
@@ -19,9 +20,9 @@ def process_agent_icons() -> None:
         print(f"❌ Raw icons directory not found at {RAW_DIR}")
         return
 
-    existing_clean = {f.name for f in CLEAN_DIR.glob("*.webp")}
+    existing_clean = {f.name for f in CLEAN_DIR.glob(pattern="*.webp")}
 
-    for img_path in RAW_DIR.glob("*.webp"):
+    for img_path in RAW_DIR.glob(pattern="*.webp"):
         base_name = img_path.name
         mirrored_name = f"Mirrored_{base_name}"
 
@@ -29,38 +30,42 @@ def process_agent_icons() -> None:
             print(f"⏩ Already exists: {base_name} (skipped)")
             continue
 
-        img = cv2.imread(str(img_path), cv2.IMREAD_UNCHANGED)
+        img = cv2.imread(filename=str(img_path), flags=cv2.IMREAD_UNCHANGED)
         if img is None or img.shape[2] != 4:
             print(f"⚠️ Failed to load or invalid format: {img_path.name}")
             continue
 
         # Process original
-        processed = standardize_image(img)
+        processed = standardize_image(img=img)
         if base_name not in existing_clean:
-            cv2.imwrite(
-                str(CLEAN_DIR / base_name), processed, [cv2.IMWRITE_WEBP_QUALITY, 90]
+            _ = cv2.imwrite(
+                filename=str(CLEAN_DIR / base_name),
+                img=processed,
+                params=[cv2.IMWRITE_WEBP_QUALITY, 90],
             )
             print(f"✅ Created: {base_name}")
 
         # Process mirrored
         if mirrored_name not in existing_clean:
-            mirrored = cv2.flip(processed, 1)
-            cv2.imwrite(
-                str(CLEAN_DIR / mirrored_name), mirrored, [cv2.IMWRITE_WEBP_QUALITY, 90]
+            mirrored = cv2.flip(src=processed, flipCode=1)
+            _ = cv2.imwrite(
+                filename=str(CLEAN_DIR / mirrored_name),
+                img=mirrored,
+                params=[cv2.IMWRITE_WEBP_QUALITY, 90],
             )
             print(f"✅ Created: {mirrored_name}")
 
 
-def standardize_image(img: np.ndarray) -> np.ndarray:
+def standardize_image(img: NDArray[np.uint8]) -> NDArray[np.uint8]:
     """Convert to grayscale while preserving alpha, then resize to 40x40."""
     bgr = img[:, :, :3]
     alpha = img[:, :, 3]
 
-    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-    gray_rgb = cv2.merge([gray, gray, gray])
-    result = cv2.merge([gray_rgb, alpha])
+    gray = cv2.cvtColor(src=bgr, code=cv2.COLOR_BGR2GRAY)
+    gray_rgb = cv2.merge(mv=[gray, gray, gray])
+    result = cv2.merge(mv=[gray_rgb, alpha])
 
-    return cv2.resize(result, (40, 40), interpolation=cv2.INTER_AREA)
+    return cv2.resize(src=result, dsize=(40, 40), interpolation=cv2.INTER_AREA)
 
 
 if __name__ == "__main__":

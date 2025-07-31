@@ -141,14 +141,16 @@ def detect_agent_icons(frame: MatLike) -> tuple[list[str], list[str]]:
         ret_agent = ""
         ret_threshold = 0
         for path in assets_folder.iterdir():
-            if path.name.endswith(".png"):
+            if path.name.endswith(".webp"):
                 is_mirrored = path.name.startswith("Mirrored_")
 
                 if is_mirrored:
                     continue
 
                 # load agent icon and get agent name
-                agent_name = path.name.replace("Mirrored_", "").replace("_icon.png", "")
+                agent_name = path.name.replace("Mirrored_", "").replace(
+                    "_icon.webp", ""
+                )
                 try:
                     # load template using imdecode
                     with path.open("rb") as template_file:
@@ -210,14 +212,16 @@ def detect_agent_icons(frame: MatLike) -> tuple[list[str], list[str]]:
         ret_agent = ""
         ret_threshold = 0
         for path in assets_folder.iterdir():
-            if path.name.endswith(".png"):
+            if path.name.endswith(".webp"):
                 is_mirrored = path.name.startswith("Mirrored_")
 
                 if not is_mirrored:
                     continue
 
                 # load agent icon and get agent name
-                agent_name = path.name.replace("Mirrored_", "").replace("_icon.png", "")
+                agent_name = path.name.replace("Mirrored_", "").replace(
+                    "_icon.webp", ""
+                )
                 try:
                     # load template using imdecode
                     with path.open("rb") as template_file:

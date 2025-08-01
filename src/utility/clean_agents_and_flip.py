@@ -1,8 +1,7 @@
 from pathlib import Path
 
 import cv2
-import numpy as np
-from numpy.typing import NDArray
+from cv2.typing import MatLike
 
 
 def process_agent_icons() -> bool:
@@ -56,7 +55,7 @@ def process_agent_icons() -> bool:
             print(f"✅ Created: {mirrored_name}")
 
 
-def standardize_image(img: NDArray[np.uint8]) -> NDArray[np.uint8]:
+def standardize_image(img: MatLike) -> MatLike:
     """Convert to grayscale while preserving alpha, then resize to 40x40."""
     bgr = img[:, :, :3]
     alpha = img[:, :, 3]

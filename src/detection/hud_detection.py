@@ -1,3 +1,16 @@
+"""
+HUD detection module for Valorant gameplay analysis.
+
+This module provides computer vision and OCR functionality to extract game state
+information from Valorant screenshots, including kill feed events, player death
+status, round information, and agent compositions using template matching.
+
+Constants:
+    VARIANCE_THRESHOLD (int): Minimum variance for valid agent icon regions (800)
+    MATCH_THRESHOLD (float): Template matching confidence threshold (0.9) 
+    KILL_FEED_TRIGGER (str): Text trigger for death detection ("KILLED BY")
+"""
+
 from importlib.resources import files
 from typing import Any, cast
 
@@ -15,7 +28,30 @@ KILL_FEED_TRIGGER = "KILLED BY"
 
 
 def detect_kill_feed(frame: MatLike) -> list[tuple[str, str]]:
-    """detects kill feed events from the provided game frame"""
+    """Detects kill feed events from the provided game frame.
+    
+    Extracts kill events from the kill feed region using OCR. The region of interest
+    is positioned at the top-right area where Valorant displays recent eliminations.
+    Text is processed in pairs to form (killer, victim) tuples.
+    
+    Args:
+        frame (MatLike): Game screenshot frame in BGR format.
+        
+    Returns:
+        list[tuple[str, str]]: List of (killer_name, victim_name) pairs from kill feed.
+        Empty list if no kills detected or OCR fails.
+        
+    Note:
+        - Kill feed region: (1420, 90) to (1900, 400)
+        - OCR results with odd length are truncated to ensure pairing
+        - Uses grayscale conversion for better OCR accuracy
+        
+    Example:
+        >>> frame = capture_screen()
+        >>> kills = detect_kill_feed(frame)
+        >>> print(kills)
+        [('player1', 'player2'), ('player3', 'player4')]
+    """
     # region of interest
     x1, y1 = 1420, 90  # top left
     x2, y2 = 1900, 400  # bottom right
@@ -40,13 +76,27 @@ def detect_kill_feed(frame: MatLike) -> list[tuple[str, str]]:
 
 
 def is_player_dead(frame: MatLike) -> bool:
-    """detects if player is dead.
+    """Detects if the player is currently dead.
+
+    Scans the kill feed region for the "KILLED BY" trigger text which appears
+    when the player has been eliminated. Uses OCR to analyze the text content
+    in the designated region of interest.
 
     Args:
-        frame (MatLike) current frame capture of gameplay
+        frame (MatLike): Current frame capture of gameplay in BGR format.
 
     Returns:
-        bool: True if player is dead, False otherwise
+        bool: True if player is dead (KILLED BY text found), False otherwise.
+        
+    Note:
+        - Detection region: (1420, 220) to (1900, 800) 
+        - Uses grayscale conversion for improved OCR performance
+        - Searches for KILL_FEED_TRIGGER constant in detected text
+        
+    Example:
+        >>> frame = capture_screen()
+        >>> if is_player_dead(frame):
+        ...     print("Player has been eliminated!")
     """
     # region of interest
     x1, y1 = 1420, 220  # top left
@@ -65,17 +115,49 @@ def is_player_dead(frame: MatLike) -> bool:
 
 
 def detect_round_info(frame: MatLike) -> tuple[int, int, str] | None:
-    """detects game state information from UI components
+    """Detects game state information from UI components.
+
+    Extracts round number, remaining time, and current score from the top HUD area.
+    The function expects three OCR elements: team1_score, time, team2_score.
 
     Args:
-        frame (MatLike): current frame capture of the gameplay
+        frame (MatLike): Current frame capture of the gameplay in BGR format.
 
     Returns:
-        tuple: (current_round, round_time, current_score) or None
+        tuple[int, int, str] | None: (current_round, round_time_seconds, score_string)
+        Returns None if detection fails or invalid HUD format detected.
+        
+    Note:
+        - Detection region: (800, 18) to (1120, 80)
+        - Time format is converted from MM:SS or MM.SS to total seconds
+        - Current round calculated as: team1_score + team2_score + 1
+        - Score format: "team1_score - team2_score"
+        
+    Example:
+        >>> frame = capture_screen()
+        >>> info = detect_round_info(frame)
+        >>> if info:
+        ...     round_num, time_sec, score = info
+        ...     print(f"Round {round_num}, {time_sec}s left, Score: {score}")
     """
 
     def fix_ocr_time_format(time_str: str) -> int:
-        """Converts a time string in 'minutes.seconds' format to total seconds"""
+        """Converts a time string in 'minutes.seconds' format to total seconds.
+        
+        Handles OCR misinterpretation where colons may be detected as dots.
+        
+        Args:
+            time_str (str): Time string in format "MM:SS" or "MM.SS"
+            
+        Returns:
+            int: Total time in seconds
+            
+        Example:
+            >>> fix_ocr_time_format("1:35")
+            95
+            >>> fix_ocr_time_format("1.35")  # OCR misread
+            95
+        """
         # If the string contains a dot, try to treat it as a colon
         if "." in time_str:
             # Replace the dot with a colon to handle OCR misinterpretation
@@ -112,9 +194,34 @@ def detect_round_info(frame: MatLike) -> tuple[int, int, str] | None:
 
 
 def detect_agent_icons(frame: MatLike) -> tuple[list[str], list[str]]:
-    """given a frame during game will return a 2d array with the characters on each team
+    """Detects agent compositions for both teams using template matching.
 
-    output: [[agent_t1, agent2_t1, ...], [agent_t2, agent2_t2, ...]]
+    Analyzes the top HUD area to identify all 10 agent icons (5 per team) using
+    template matching with pre-processed agent icon images. Team 1 uses normal
+    icons while Team 2 uses horizontally mirrored versions.
+
+    Args:
+        frame (MatLike): Game screenshot frame in BGR format.
+
+    Returns:
+        tuple[list[str], list[str]]: (team1_agents, team2_agents) where each list
+        contains sorted agent names in lowercase. Lists may be shorter than 5
+        if agents are dead (empty regions detected).
+        
+    Note:
+        - Team 1 region: starts at (435, 30), moves right by 65px per agent
+        - Team 2 region: starts at (1423, 30), moves left by 65px per agent
+        - Uses VARIANCE_THRESHOLD to skip empty regions (dead agents)
+        - Template matching threshold: MATCH_THRESHOLD (0.9)
+        - Agent names returned in lowercase and sorted alphabetically
+        
+    Example:
+        >>> frame = capture_screen()
+        >>> team1, team2 = detect_agent_icons(frame)
+        >>> print(f"Your team: {team1}")
+        >>> print(f"Enemy team: {team2}")
+        Your team: ['jett', 'phoenix', 'sage', 'sova', 'viper']
+        Enemy team: ['breach', 'cypher', 'omen', 'raze', 'reyna']
     """
     assets_folder = files(icons)
 

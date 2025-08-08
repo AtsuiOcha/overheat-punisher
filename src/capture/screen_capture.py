@@ -47,19 +47,42 @@ def show_screen_capture() -> None:
     """
     window_name = "Screen Capture"
     try:
+        logger.info("Starting screen capture. Press '~' to exit...")
+
         while True:
-            logger.info("Starting screen capture loop...")
             frame = capture_screen()
 
             # Display the frame in a window
-            cv2.imshow(winname="Screen Capture", mat=frame)
+            cv2.imshow(winname=window_name, mat=frame)
 
-            # exit on '~' key press for "leave"
-            if cv2.waitKey(delay=1) & 0xFF == ord("~"):
+            # Check for key press - increased delay helps with responsiveness
+            key = cv2.waitKey(delay=30) & 0xFF
+
+            # exit on '~' key press
+            if key == ord("~"):
                 logger.info("Exit key pressed. Stopping capture.")
                 break
 
-        # release resources
-        cv2.destroyAllWindows()
+            # Check if window was closed by user clicking X
+            if (
+                cv2.getWindowProperty(winname=window_name, prop_id=cv2.WND_PROP_VISIBLE)
+                < 1
+            ):
+                logger.info("Window closed by user. Stopping capture.")
+                break
+
+    except KeyboardInterrupt:
+        logger.info("Interrupted by user")
     except Exception as cv2_err:
         logger.error(f"Unexpected error in show_screen_capture {cv2_err}")
+    finally:
+        # More aggressive cleanup for macOS
+        try:
+            cv2.destroyWindow(winname=window_name)
+            cv2.destroyAllWindows()
+            # Force window system to update
+            for i in range(4):
+                cv2.waitKey(delay=1)
+        except Exception:
+            pass  # Ignore cleanup errors
+        logger.info("Screen capture stopped and resources cleaned up")

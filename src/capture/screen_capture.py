@@ -1,3 +1,11 @@
+"""
+Screen capture module for real-time gameplay monitoring.
+
+This module provides functionality to capture screenshots from the primary monitor
+for Valorant gameplay analysis. Uses MSS (Multiple Screenshot System) for fast,
+cross-platform screen capture with OpenCV for image processing.
+"""
+
 import cv2
 import mss
 import numpy as np

@@ -33,7 +33,7 @@ def test_detect_kill_feed1() -> None:
 
 # test check killed by exists positive test
 @pytest.mark.unit
-def test_check_killed_by_pos():
+def test_check_killed_by_pos() -> None:
     # load test image from assets folder
     test_img = files(game_scenarios).joinpath("kill_feed_death.png")
 
@@ -50,7 +50,7 @@ def test_check_killed_by_pos():
 
 @pytest.mark.unit
 # test check killed by exists negative test
-def test_check_killed_by_neg():
+def test_check_killed_by_neg() -> None:
     # load test image from assets folder
     test_img = files(game_scenarios).joinpath("mid_round.png")
 
@@ -67,7 +67,7 @@ def test_check_killed_by_neg():
 
 @pytest.mark.unit
 # test round info detection
-def test_detect_round_info():
+def test_detect_round_info() -> None:
     # load test image from assets folder
     test_img = files(game_scenarios).joinpath("mid_round.png")
 
@@ -91,7 +91,7 @@ def test_detect_round_info():
 
 @pytest.mark.unit
 # test team agent detection with deaths
-def test_agent_detection_with_deaths():
+def test_agent_detection_with_deaths() -> None:
     # load test image from assets folder
     test_img = files(game_scenarios).joinpath("kill_feed_death.png")
 
@@ -113,7 +113,7 @@ def test_agent_detection_with_deaths():
 
 @pytest.mark.unit
 # test team agent detection no deaths
-def test_agent_detection_no_deaths():
+def test_agent_detection_no_deaths() -> None:
     # load test image from assets folder
     test_img = files(game_scenarios).joinpath("mid_round.png")
 

@@ -19,17 +19,17 @@ start_x, start_y = None, None
 
 def get_coords(event: int, x: int, y: int, _flags: int, _param: object) -> None:
     """Mouse callback function to capture click coordinates.
-    
+
     Handles left mouse button clicks to record and print x, y coordinates.
     Used for identifying regions of interest in Valorant screenshots.
-    
+
     Args:
         event (int): OpenCV mouse event type.
         x (int): X-coordinate of mouse click.
         y (int): Y-coordinate of mouse click.
         _flags (int): Additional flags (unused).
         _param (object): User data (unused).
-        
+
     Note:
         Updates global variables start_x and start_y when left button is clicked.
     """
@@ -41,18 +41,19 @@ def get_coords(event: int, x: int, y: int, _flags: int, _param: object) -> None:
 
 def main() -> None:
     """Main function to run the coordinate explorer.
-    
+
     Loads a test screenshot and displays it in an interactive window.
     Users can click anywhere on the image to get coordinates printed
     to the console. Useful for defining detection regions.
-    
+
     Example:
         >>> main()  # Opens window with test screenshot
         # Click anywhere to see coordinates
         Coords: (1420, 90)  # Example output
     """
+    filename = input("Enter a screenshot without file extension: ").strip()
     # Load image from package resources
-    resource = files(game_scenarios).joinpath("kill_feed_death.png")
+    resource = files(game_scenarios).joinpath(f"{filename}.png")
 
     with resource.open("rb") as f:
         image = cv2.imdecode(

@@ -29,25 +29,18 @@ A real-time computer vision tool that analyzes Valorant gameplay footage to dete
    cd overheat-punisher
    ```
 
-2. **Create and activate a virtual environment:**
+2. **Install dependencies with uv:**
    ```bash
-   # Windows
-   python -m venv venv
-   .\venv\Scripts\activate
+   # Install uv if you haven't already
+   brew install uv
    
-   # macOS/Linux
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-3. **Install the package:**
-   ```bash
-   pip install -e .
-   ```
-
-4. **Install development dependencies (optional):**
-   ```bash
-   pip install -e .[dev]
+   # Option A: Let uv manage the virtual environment automatically (recommended)
+   uv sync --dev
+   
+   # Option B: Create your own virtual environment first
+   uv venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   uv sync --dev
    ```
 
 ## 📖 Usage
@@ -123,13 +116,13 @@ Run the test suite:
 
 ```bash
 # Run all tests
-pytest
+uv run pytest
 
 # Run with verbose output
-pytest -v
+uv run pytest -v
 
 # Run only unit tests
-pytest -m unit
+uv run pytest -m unit
 ```
 
 ## 📚 API Reference

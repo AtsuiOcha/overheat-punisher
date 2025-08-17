@@ -32,9 +32,10 @@ dependencies = [
     "shapely~=2.0",
     "sympy~=1.13",
     "tifffile~=2024.9",
-    "torch~=2.5",
+    "torch~=2.6",
     "torchvision~=0.20",
     "typing-extensions~=4.12",
+    "pydantic>=2.11.7",
 ]
 
 [dependency-groups]

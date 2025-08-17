@@ -21,12 +21,25 @@ import numpy as np
 import torch
 from cv2.typing import MatLike
 from loguru import logger
+from pydantic import BaseModel, ValidationError
 
 import src.assets.agent_icons_clean as icons
 
 VARIANCE_THRESHOLD = 800
 MATCH_THRESHOLD = 0.9
 KILL_FEED_TRIGGER = "KILLED BY"
+
+
+class OcrResult(BaseModel):
+    bbox: list[tuple[int, int]]
+    text: str
+    confidence: float
+
+
+class KillFeedLine(TypedDict):
+    killer: str
+    victim: str
+    was_team_death: bool
 
 
 class RoundInfo(TypedDict):
@@ -54,47 +67,58 @@ MATCH_MAP = {
 }
 
 
-def detect_kill_feed(frame: MatLike) -> list[tuple[str, str]]:
-    """Detects kill feed events from the provided game frame.
+def classify_team_death_event(patch: MatLike) -> bool:
+    mean_color = patch.mean(axis=(0, 1))
+    blue, green, red = mean_color
 
-    Extracts kill events from the kill feed region using OCR. The region of interest
-    is positioned at the top-right area where Valorant displays recent eliminations.
-    Text is processed in pairs to form (killer, victim) tuples.
+    # we force cast that fucky np.bool_ to python bool
+    return bool(red <= max(blue, green) * 1.2)
 
-    Args:
-        frame (MatLike): Game screenshot frame in BGR format.
 
-    Returns:
-        list[tuple[str, str]]: List of (killer_name, victim_name) pairs from kill feed.
-        Empty list if no kills detected or OCR fails.
+def crop_patch(roi: MatLike, bbox: list[tuple[int, int]]) -> MatLike:
+    xs = [p[0] for p in bbox]
+    ys = [p[1] for p in bbox]
+    return roi[int(min(ys)) : int(max(ys)), int(min(xs)) : int(max(xs))]
 
-    Note:
-        - Kill feed region: (1420, 90) to (1900, 400)
-        - OCR results with odd length are truncated to ensure pairing
-        - Uses grayscale conversion for better OCR accuracy
-    """
+
+def detect_kill_feed(frame: MatLike) -> list[KillFeedLine]:
     # region of interest
-    x1, y1 = 1420, 90  # top left
-    x2, y2 = 1900, 400  # bottom right
-    roi = cast(MatLike, frame[y1:y2, x1:x2])
+    roi_x_min, roi_y_min = 1420, 90
+    roi_x_max, roi_y_max = 1900, 400
+    roi_color = frame[roi_y_min:roi_y_max, roi_x_min:roi_x_max]
 
     # OCR works better on grayscale
-    # gray_roi = cv2.cvtColor(src=roi, code=cv2.COLOR_BGR2GRAY)
+    gray_roi = cv2.cvtColor(src=roi_color, code=cv2.COLOR_BGR2GRAY)
 
     # intialize easyOCR reader
     reader = easyocr.Reader(lang_list=["en"], gpu=torch.cuda.is_available())
 
-    # values are maybe it can help us split guns
-    text_res = cast(list[str], reader.readtext(image=roi, detail=0))
-    logger.info(f"easyocr reader found {text_res=}")
+    raw_ocr = reader.readtext(image=gray_roi, detail=1)
 
-    # kill feed should have even length
-    if len(text_res) % 2 != 0:
-        text_res = text_res[:-1]
+    try:
+        ocr_res = [
+            OcrResult(bbox=bbox, text=text, confidence=conf)
+            for (bbox, text, conf) in raw_ocr
+        ]
+        if len(ocr_res) % 2 != 0:
+            ocr_res = ocr_res[:-1]
+    except ValidationError as val_err:
+        logger.error(f"OCR validation failed: {val_err=}")
+        raise
 
-    # Group into tuples (killer, killed)
-    kill_feed = [(text_res[i], text_res[i + 1]) for i in range(0, len(text_res), 2)]
-    return kill_feed
+    return [
+        KillFeedLine(
+            killer=ocr_res[i].text,
+            victim=ocr_res[i + 1].text,
+            was_team_death=classify_team_death_event(
+                patch=crop_patch(
+                    roi_color,
+                    ocr_res[i + 1].bbox,
+                ),
+            ),
+        )
+        for i in range(0, len(ocr_res), 2)
+    ]
 
 
 def is_player_dead(frame: MatLike) -> bool:

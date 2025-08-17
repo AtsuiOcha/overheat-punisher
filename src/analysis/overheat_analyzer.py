@@ -45,6 +45,21 @@ class OverheatEvent:
 
 
 def team_diff_at_death(prev_frame: MatLike, cur_frame: MatLike) -> int:
+    # team diff at prev frame
+    team1, team2 = hud_detection.detect_agent_icons(frame=prev_frame)
+    prev_team_diff = len(team1) - len(team2)
+
+    # team diff at current frame
+    team1, team2 = hud_detection.detect_agent_icons(frame=cur_frame)
+    curr_team_diff = len(team1) - len(team2)
+
+    if curr_team_diff + 1 == prev_team_diff:
+        # player was the only death that occured
+        return curr_team_diff
+    
+    # reconstruct timeline from killfeed.
+
+    
 
 
 

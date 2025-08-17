@@ -7,16 +7,18 @@ status, round information, and agent compositions using template matching.
 
 Constants:
     VARIANCE_THRESHOLD (int): Minimum variance for valid agent icon regions (800)
-    MATCH_THRESHOLD (float): Template matching confidence threshold (0.9) 
+    MATCH_THRESHOLD (float): Template matching confidence threshold (0.9)
     KILL_FEED_TRIGGER (str): Text trigger for death detection ("KILLED BY")
 """
 
+from enum import Enum
 from importlib.resources import files
-from typing import Any, cast
+from typing import Any, TypedDict, cast
 
 import cv2
 import easyocr
 import numpy as np
+import torch
 from cv2.typing import MatLike
 from loguru import logger
 
@@ -27,30 +29,49 @@ MATCH_THRESHOLD = 0.9
 KILL_FEED_TRIGGER = "KILLED BY"
 
 
+class RoundInfo(TypedDict):
+    cur_round: int
+    round_time_sec: int
+    score: str
+
+
+class RoundState(Enum):
+    """Represents the current round state in Valorant."""
+
+    PRE_ROUND = 1
+    MID_ROUND = 2
+    POST_ROUND = 3
+
+
+MATCH_MAP = {
+    # pre round matches
+    "buy phase": RoundState.PRE_ROUND,
+    # post round
+    "lost": RoundState.POST_ROUND,
+    "won": RoundState.POST_ROUND,
+    "clutch": RoundState.POST_ROUND,
+    "ace": RoundState.POST_ROUND,
+}
+
+
 def detect_kill_feed(frame: MatLike) -> list[tuple[str, str]]:
     """Detects kill feed events from the provided game frame.
-    
+
     Extracts kill events from the kill feed region using OCR. The region of interest
     is positioned at the top-right area where Valorant displays recent eliminations.
     Text is processed in pairs to form (killer, victim) tuples.
-    
+
     Args:
         frame (MatLike): Game screenshot frame in BGR format.
-        
+
     Returns:
         list[tuple[str, str]]: List of (killer_name, victim_name) pairs from kill feed.
         Empty list if no kills detected or OCR fails.
-        
+
     Note:
         - Kill feed region: (1420, 90) to (1900, 400)
         - OCR results with odd length are truncated to ensure pairing
         - Uses grayscale conversion for better OCR accuracy
-        
-    Example:
-        >>> frame = capture_screen()
-        >>> kills = detect_kill_feed(frame)
-        >>> print(kills)
-        [('player1', 'player2'), ('player3', 'player4')]
     """
     # region of interest
     x1, y1 = 1420, 90  # top left
@@ -61,10 +82,11 @@ def detect_kill_feed(frame: MatLike) -> list[tuple[str, str]]:
     gray_roi = cv2.cvtColor(src=roi, code=cv2.COLOR_BGR2GRAY)
 
     # intialize easyOCR reader
-    reader = easyocr.Reader(lang_list=["en"], gpu=False)
+    reader = easyocr.Reader(lang_list=["en"], gpu=torch.cuda.is_available())
 
     # values are maybe it can help us split guns
     text_res = cast(list[str], reader.readtext(image=gray_roi, detail=0))
+    logger.info(f"easyocr reader found {text_res=}")
 
     # kill feed should have even length
     if len(text_res) % 2 != 0:
@@ -87,16 +109,11 @@ def is_player_dead(frame: MatLike) -> bool:
 
     Returns:
         bool: True if player is dead (KILLED BY text found), False otherwise.
-        
+
     Note:
-        - Detection region: (1420, 220) to (1900, 800) 
+        - Detection region: (1420, 220) to (1900, 800)
         - Uses grayscale conversion for improved OCR performance
         - Searches for KILL_FEED_TRIGGER constant in detected text
-        
-    Example:
-        >>> frame = capture_screen()
-        >>> if is_player_dead(frame):
-        ...     print("Player has been eliminated!")
     """
     # region of interest
     x1, y1 = 1420, 220  # top left
@@ -106,15 +123,16 @@ def is_player_dead(frame: MatLike) -> bool:
     gray_roi = cv2.cvtColor(src=roi, code=cv2.COLOR_BGR2GRAY)
 
     # intialize easyOCR reader
-    reader = easyocr.Reader(lang_list=["en"], gpu=False)
+    reader = easyocr.Reader(lang_list=["en"], gpu=torch.cuda.is_available())
 
     text_res = cast(list[str], reader.readtext(image=gray_roi, detail=0))
+    logger.info(f"easyocr reader found {text_res=}")
 
     # check for existance of 'KILLED BY'
     return any(KILL_FEED_TRIGGER in text for text in text_res)
 
 
-def detect_round_info(frame: MatLike) -> tuple[int, int, str] | None:
+def detect_round_info(frame: MatLike) -> RoundInfo:
     """Detects game state information from UI components.
 
     Extracts round number, remaining time, and current score from the top HUD area.
@@ -126,37 +144,24 @@ def detect_round_info(frame: MatLike) -> tuple[int, int, str] | None:
     Returns:
         tuple[int, int, str] | None: (current_round, round_time_seconds, score_string)
         Returns None if detection fails or invalid HUD format detected.
-        
+
     Note:
         - Detection region: (800, 18) to (1120, 80)
         - Time format is converted from MM:SS or MM.SS to total seconds
         - Current round calculated as: team1_score + team2_score + 1
         - Score format: "team1_score - team2_score"
-        
-    Example:
-        >>> frame = capture_screen()
-        >>> info = detect_round_info(frame)
-        >>> if info:
-        ...     round_num, time_sec, score = info
-        ...     print(f"Round {round_num}, {time_sec}s left, Score: {score}")
     """
 
     def fix_ocr_time_format(time_str: str) -> int:
         """Converts a time string in 'minutes.seconds' format to total seconds.
-        
+
         Handles OCR misinterpretation where colons may be detected as dots.
-        
+
         Args:
             time_str (str): Time string in format "MM:SS" or "MM.SS"
-            
+
         Returns:
             int: Total time in seconds
-            
-        Example:
-            >>> fix_ocr_time_format("1:35")
-            95
-            >>> fix_ocr_time_format("1.35")  # OCR misread
-            95
         """
         # If the string contains a dot, try to treat it as a colon
         if "." in time_str:
@@ -178,19 +183,26 @@ def detect_round_info(frame: MatLike) -> tuple[int, int, str] | None:
     gray_roi = cv2.cvtColor(src=roi, code=cv2.COLOR_BGR2GRAY)
 
     # intialize easyOCR reader
-    reader = easyocr.Reader(lang_list=["en"], gpu=False)  # set gpu = True if have gpu
+    reader = easyocr.Reader(
+        lang_list=["en"], gpu=torch.cuda.is_available()
+    )  # set gpu = True if have gpu
 
     text_res = cast(list[str], reader.readtext(gray_roi, detail=0))
+    logger.info(f"easyocr reader found {text_res=}")
 
     if len(text_res) == 3:
-        round_time = fix_ocr_time_format(time_str=text_res[1])
-        cur_round = int(text_res[0]) + int(text_res[2]) + 1
-        score = f"{text_res[0]} - {text_res[2]}"
+        # TODO: make custom exception for hud_detection
+        raise ValueError(f"Error getting round_info information")
 
-        return (cur_round, round_time, score)
-    else:
-        logger.error("round info reader detected invalid hud format: %s", text_res)
-        return None
+    round_time = fix_ocr_time_format(time_str=text_res[1])
+    cur_round = int(text_res[0]) + int(text_res[2]) + 1
+    score = f"{text_res[0]} - {text_res[2]}"
+
+    return RoundInfo(
+        cur_round=cur_round,
+        round_time_sec=round_time,
+        score=score,
+    )
 
 
 def detect_agent_icons(frame: MatLike) -> tuple[list[str], list[str]]:
@@ -207,21 +219,13 @@ def detect_agent_icons(frame: MatLike) -> tuple[list[str], list[str]]:
         tuple[list[str], list[str]]: (team1_agents, team2_agents) where each list
         contains sorted agent names in lowercase. Lists may be shorter than 5
         if agents are dead (empty regions detected).
-        
+
     Note:
         - Team 1 region: starts at (435, 30), moves right by 65px per agent
         - Team 2 region: starts at (1423, 30), moves left by 65px per agent
         - Uses VARIANCE_THRESHOLD to skip empty regions (dead agents)
         - Template matching threshold: MATCH_THRESHOLD (0.9)
         - Agent names returned in lowercase and sorted alphabetically
-        
-    Example:
-        >>> frame = capture_screen()
-        >>> team1, team2 = detect_agent_icons(frame)
-        >>> print(f"Your team: {team1}")
-        >>> print(f"Enemy team: {team2}")
-        Your team: ['jett', 'phoenix', 'sage', 'sova', 'viper']
-        Enemy team: ['breach', 'cypher', 'omen', 'raze', 'reyna']
     """
     assets_folder = files(icons)
 
@@ -374,3 +378,25 @@ def detect_agent_icons(frame: MatLike) -> tuple[list[str], list[str]]:
 
     # sort the agents for easier testing
     return (sorted(team1_agents), sorted(team2_agents))
+
+
+def detect_round_state(frame: MatLike) -> RoundState:
+    # region of interest
+    x1, y1 = 800, 140  # top left
+    x2, y2 = 1145, 275  # bottom right
+    roi = frame[y1:y2, x1:x2]
+
+    gray_roi = cv2.cvtColor(src=roi, code=cv2.COLOR_BGR2GRAY)
+
+    # intialize easyOCR reader
+    reader = easyocr.Reader(
+        lang_list=["en"], gpu=torch.cuda.is_available()
+    )  # set gpu = True if have gpu
+
+    text_res = cast(list[str], reader.readtext(gray_roi, detail=0))
+    logger.info(f"easyocr reader found {text_res=}")
+
+    return next(
+        (MATCH_MAP[word.lower()] for word in text_res if word.lower() in MATCH_MAP),
+        RoundState.MID_ROUND,
+    )

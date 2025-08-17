@@ -76,16 +76,16 @@ def detect_kill_feed(frame: MatLike) -> list[tuple[str, str]]:
     # region of interest
     x1, y1 = 1420, 90  # top left
     x2, y2 = 1900, 400  # bottom right
-    roi = frame[y1:y2, x1:x2]
+    roi = cast(MatLike, frame[y1:y2, x1:x2])
 
     # OCR works better on grayscale
-    gray_roi = cv2.cvtColor(src=roi, code=cv2.COLOR_BGR2GRAY)
+    # gray_roi = cv2.cvtColor(src=roi, code=cv2.COLOR_BGR2GRAY)
 
     # intialize easyOCR reader
     reader = easyocr.Reader(lang_list=["en"], gpu=torch.cuda.is_available())
 
     # values are maybe it can help us split guns
-    text_res = cast(list[str], reader.readtext(image=gray_roi, detail=0))
+    text_res = cast(list[str], reader.readtext(image=roi, detail=0))
     logger.info(f"easyocr reader found {text_res=}")
 
     # kill feed should have even length

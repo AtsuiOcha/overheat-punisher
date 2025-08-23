@@ -14,28 +14,20 @@ from src.detection import hud_detection
 class FrameState:
     """Current game state."""
 
-    frame: MatLike  
-    prev_frame: MatLike | None = None
-
-    is_mid_round: bool = field(init=False)          
-    curr_seconds: int = field(init=False)
-    score: str = field(init=False)
-    team_diff: int = field(init=False)
+    frame: MatLike
+    team_diff: int | None
+    round_time_sec: int = field(init=False)
+    killer: str = field(init=False)
 
     def __post_init__(self):
-        # gather game state information
-        round_info = hud_detection.detect_round_info(frame=self.frame)
-        self.curr_seconds = round_info["round_time_sec"]
-        self.score = round_info["score"]
+        round_info = hud_detection.detect_round_info(frame=self.frame) 
+        
+        self.round_time_sec = round_info["round_time_sec"]
+        if self.team_diff is None:
+            team1, team2 = hud_detection.detect_agent_icons(frame=self.frame)  
+            self.team_diff = len(team1) - len(team2)
 
-        self.is_mid_round = (
-            hud_detection.detect_round_state(frame=self.frame)
-            == hud_detection.RoundState.MID_ROUND
-        )
 
-        team1, team2 = hud_detection.detect_agent_icons(frame=self.frame)
-
-        self.team_diff = len(team1) - len(team2)
 
 @dataclass
 class OverheatEvent:
@@ -63,7 +55,7 @@ def team_diff_at_death(target_player: str, prev_frame: MatLike, cur_frame: MatLi
 
     for feed_event in kill_feed:
         team_diff_at_event = team_diff_at_event - 1 if feed_event["was_team_death"] else team_diff_at_event + 1
-        if feed_event["victim"] == target_player:
+        if feed_event["victim"].lower() == target_player.lower():
             return team_diff_at_event
 
     return team_diff_at_event

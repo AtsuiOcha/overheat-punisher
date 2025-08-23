@@ -12,38 +12,25 @@ from .detection import RoundState, detect_round_state, is_player_dead
 PLAYER_NAME = "malding"
 
 
-def get_death_frame_state(
+def check_for_death_frame(
     prev_frame: MatLike,
     frame: MatLike,
-    prev_death_frame_state: FrameState | None,
 ) -> FrameState | None:
-    if prev_death_frame_state:
-        # do some stuff
-        ...
-    round_state = detect_round_state(frame=frame)
     true_team_death = team_diff_at_death(
         target_player=PLAYER_NAME,
         prev_frame=prev_frame,
         cur_frame=frame,
     )
-    # TODO: there might be an issue here when we are mid round but looking at score
-    if (
-        round_state == RoundState.MID_ROUND
-        and is_player_dead(frame=frame)
-        and true_team_death >= -1
-    ):
-        return FrameState(
-            frame=frame,
-            team_diff=true_team_death,
-        )
-    return None
 
-
-# TODO: get away from using a detection state we can use the existence of a death state
-#   for determing weather we are to look for some overheat event or not
+    return (
+        FrameState(frame=frame, team_diff=true_team_death)
+        if is_player_dead(frame=frame) and true_team_death >= -1
+        else None
+    )
 
 
 def main():
+    round_state: RoundState = RoundState.PRE_ROUND
     death_frame_state: FrameState | None = None
     prev_frame: MatLike | None = None
     while True:
@@ -52,34 +39,26 @@ def main():
 
         # ensure an intial frame has been read
         if prev_frame:
-            curr_detection_state = get_death_frame_state(
-                prev_frame=prev_frame,
-                frame=cur_frame,
-                prev_detection_state=detection_state,
-            )
-
-            # reset if we notice round change
-            if (
-                detection_state == DetectionState.ANALYZING
-                and curr_detection_state == DetectionState.MONITORING
-            ):
-                death_frame_state = None
-
-            detection_state = curr_detection_state
-            if curr_detection_state == DetectionState.ANALYZING:
-                # set death frame
-                if not death_frame_state:
-                    death_frame_state = FrameState(
-                        frame=cur_frame, prev_frame=prev_frame
-                    )
-                    prev_frame = cur_frame
-                    continue
+            if not death_frame_state:
+                death_frame_state = check_for_death_frame(
+                    prev_frame=prev_frame,
+                    frame=cur_frame,
+                )
+                round_state = RoundState.MID_ROUND
+            else:
                 if detect_overheat(
                     death_frame_state=death_frame_state,
                     cur_frame_state=FrameState(frame=cur_frame),
                 ):
                     # notify here
                     ...
+
+                # reset as we've moved to the next round
+                if (
+                    new_round_state := detect_round_state(frame=cur_frame)
+                ) != round_state:
+                    round_state = new_round_state
+                    death_frame_state = None
 
         prev_frame = cur_frame
 

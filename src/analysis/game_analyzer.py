@@ -15,7 +15,7 @@ class FrameState:
     """Current game state."""
 
     frame: MatLike
-    team_diff: int | None
+    team_diff: int | None = None
     round_time_sec: int = field(init=False)
     killer: str = field(init=False)
 

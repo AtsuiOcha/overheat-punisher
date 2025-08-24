@@ -1,4 +1,5 @@
 from .hud_detection import (
+    KillFeedLine,
     RoundInfo,
     RoundState,
     detect_agent_icons,
@@ -16,4 +17,5 @@ __all__ = [
     "is_player_dead",
     "RoundInfo",
     "RoundState",
+    "KillFeedLine",
 ]

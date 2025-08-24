@@ -1,4 +1,5 @@
 from importlib.resources import files
+from pprint import pprint
 
 import cv2
 import numpy as np
@@ -10,7 +11,7 @@ from src.detection import hud_detection
 
 # test detect kill feed when kill feed contains valid events
 @pytest.mark.unit
-def test_detect_kill_feed1() -> None:
+def test_kill_feed_detection() -> None:
     # load test image from assets folder
     test_img = files(game_scenarios).joinpath("kill_feed_death.png")
 
@@ -23,12 +24,17 @@ def test_detect_kill_feed1() -> None:
         frame = cv2.cvtColor(src=frame, code=cv2.COLOR_BGRA2BGR)
 
     kill_feed = hud_detection.detect_kill_feed(frame)
+    pprint(kill_feed)
 
     # ASSERTIONS
     assert kill_feed is not None
     assert len(kill_feed) == 2
-    assert kill_feed[0] == ("zlabobabil", "Iso")
-    assert kill_feed[1] == ("igneous rock fan", "zlabobabil")
+    assert kill_feed[0]["killer"] == "zlabobabil"
+    assert kill_feed[0]["victim"] == "Iso"
+    assert not kill_feed[0]["was_team_death"]
+    assert kill_feed[1]["killer"] == "igneous rock fan"
+    assert kill_feed[1]["victim"] == "zlabobabil"
+    assert kill_feed[1]["was_team_death"]
 
 
 # test check killed by exists positive test

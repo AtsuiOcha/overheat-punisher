@@ -10,6 +10,8 @@ from loguru import logger
 
 from src.detection import hud_detection
 
+PLAYER_NAME = "malding"
+
 
 @dataclass
 class FrameState:
@@ -58,6 +60,23 @@ def team_diff_at_death(
             return team_diff_at_event
 
     return team_diff_at_event
+
+
+def check_for_death_frame(
+    prev_frame: MatLike,
+    frame: MatLike,
+) -> FrameState | None:
+    true_team_death = team_diff_at_death(
+        target_player=PLAYER_NAME,
+        prev_frame=prev_frame,
+        cur_frame=frame,
+    )
+
+    return (
+        FrameState(frame=frame, team_diff=true_team_death)
+        if is_player_dead(frame=frame) and true_team_death >= -1
+        else None
+    )
 
 
 def check_overheat(death_frame_state: FrameState, cur_frame_state: FrameState) -> bool:

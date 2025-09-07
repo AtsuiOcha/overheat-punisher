@@ -4,6 +4,7 @@ Detects when monitored player takes unnecessary fights.
 """
 
 from dataclasses import dataclass, field
+from enum import Enum, auto
 
 from cv2.typing import MatLike
 from loguru import logger
@@ -13,6 +14,12 @@ from src.detection import hud_detection
 PLAYER_NAME = "malding"
 
 
+class AnalysisResult(Enum):
+    OVERHEAT = auto()
+    SAFE_CONTINUE = auto()
+    SAFE_RESET = auto()
+
+
 @dataclass
 class FrameState:
     """Current game state."""
@@ -20,7 +27,6 @@ class FrameState:
     frame: MatLike
     team_diff: int | None = None
     round_time_sec: int = field(init=False)
-    killer: str = field(init=False)
 
     def __post_init__(self):
         round_info = hud_detection.detect_round_info(frame=self.frame)
@@ -74,14 +80,26 @@ def check_for_death_frame(
 
     return (
         FrameState(frame=frame, team_diff=true_team_death)
-        if is_player_dead(frame=frame) and true_team_death >= -1
+        if hud_detection.is_player_dead(frame=frame) and true_team_death >= -1
         else None
     )
 
 
-def check_overheat(death_frame_state: FrameState, cur_frame_state: FrameState) -> bool:
-    if cur_frame_state.team_diff and death_frame_state.team_diff:
-        return cur_frame_state.team_diff > death_frame_state.team_diff
+def check_overheat(
+    death_frame_state: FrameState, cur_frame_state: FrameState
+) -> AnalysisResult:
+    if not (cur_frame_state.team_diff and death_frame_state.team_diff):
+        logger.error(
+            f"team_diffs found to be None {cur_frame_state=} {death_frame_state=}"
+        )
+        raise ValueError("team diffs not set properly")
 
-    logger.error(f"team_diffs found to be None {cur_frame_state=} {death_frame_state=}")
-    raise ValueError("team diffs not set properly")
+    death_traded = cur_frame_state.team_diff > death_frame_state.team_diff
+    trade_window_expired = (
+        cur_frame_state.round_time_sec < death_frame_state.round_time_sec - 3
+    )
+
+    if trade_window_expired:
+        return AnalysisResult.OVERHEAT
+
+    return AnalysisResult.SAFE_RESET if death_traded else AnalysisResult.SAFE_CONTINUE

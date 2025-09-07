@@ -1,20 +1,19 @@
 import threading
-from datetime import datetime
 
 import keyboard
 from cv2.typing import MatLike
 from loguru import logger
 
+from src.analysis.game_analyzer import AnalysisResult
+
 from .analysis import FrameState, check_for_death_frame, check_overheat
 from .capture import capture_screen
-from .detection import RoundState, detect_round_state
 
 running = False
 
 
 def loop():
     global running
-    round_state: RoundState = RoundState.PRE_ROUND
     death_frame_state: FrameState | None = None
     prev_frame: MatLike | None = None
     while running:
@@ -28,23 +27,15 @@ def loop():
                     prev_frame=prev_frame,
                     frame=cur_frame,
                 )
-                round_state = RoundState.MID_ROUND
             else:
-                if check_overheat(
+                anal_res = check_overheat(
                     death_frame_state=death_frame_state,
-                    cur_frame_state=FrameState(frame=cur_frame),
-                ):
-                    # notify here
-                    logger.info(
-                        f"detected player overheat {datetime.now().isoformat()}"
-                    )
-                    death_frame_state = None
+                    cur_frame_state=FrameState(cur_frame),
+                )
 
-                # reset as we've moved to the next round
-                if (
-                    new_round_state := detect_round_state(frame=cur_frame)
-                ) != round_state:
-                    round_state = new_round_state
+                if anal_res == AnalysisResult.OVERHEAT:
+                    ...  # notify
+                elif anal_res == AnalysisResult.SAFE_RESET:
                     death_frame_state = None
 
         prev_frame = cur_frame

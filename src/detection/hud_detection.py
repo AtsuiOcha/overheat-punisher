@@ -214,9 +214,9 @@ def detect_round_info(frame: MatLike) -> RoundInfo:
     text_res = cast(list[str], reader.readtext(gray_roi, detail=0))
     logger.info(f"easyocr reader found {text_res=}")
 
-    if len(text_res) == 3:
+    if len(text_res) != 3:
         # TODO: make custom exception for hud_detection
-        raise ValueError(f"Error getting round_info information")
+        raise ValueError(f"Error getting round_info information {len(text_res)}")
 
     round_time = fix_ocr_time_format(time_str=text_res[1])
     cur_round = int(text_res[0]) + int(text_res[2]) + 1

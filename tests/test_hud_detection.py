@@ -71,8 +71,8 @@ def test_check_killed_by_neg() -> None:
     assert not hud_detection.is_player_dead(frame)
 
 
-@pytest.mark.unit
-# test round info detection
+@pytest.mark.solo
+# test detect scores
 def test_detect_round_info() -> None:
     # load test image from assets folder
     test_img = files(game_scenarios).joinpath("mid_round.png")
@@ -85,11 +85,9 @@ def test_detect_round_info() -> None:
     if frame.shape[2] == 4:
         frame = cv2.cvtColor(src=frame, code=cv2.COLOR_BGRA2BGR)
 
-    round_info = hud_detection.detect_round_info(frame)
-
-    assert round_info["cur_round"] == 15
-    assert round_info["round_time_sec"] == 95
-    assert round_info["score"] == "8 - 6"
+    scores = hud_detection.detect_scores(frame)
+    assert scores.team1 == 8
+    assert scores.team2 == 6
 
 
 @pytest.mark.unit

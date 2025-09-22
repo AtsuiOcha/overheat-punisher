@@ -13,7 +13,7 @@ Constants:
 
 from enum import Enum
 from importlib.resources import files
-from typing import Any, TypedDict, cast
+from typing import Any, NamedTuple, TypedDict, cast
 
 import cv2
 import easyocr
@@ -31,7 +31,7 @@ KILL_FEED_TRIGGER = "KILLED BY"
 
 
 class OcrResult(BaseModel):
-    bbox: list[tuple[int, int]]
+    bbox: list[tuple[float, float]]
     text: str
     confidence: float
 
@@ -42,10 +42,9 @@ class KillFeedLine(TypedDict):
     was_team_death: bool
 
 
-class RoundInfo(TypedDict):
-    cur_round: int
-    round_time_sec: int
-    score: str
+class Scores(NamedTuple):
+    team1: int
+    team2: int
 
 
 class RoundState(Enum):
@@ -94,6 +93,7 @@ def detect_kill_feed(frame: MatLike) -> list[KillFeedLine]:
     reader = easyocr.Reader(lang_list=["en"], gpu=torch.cuda.is_available())
 
     raw_ocr = reader.readtext(image=gray_roi, detail=1)
+    logger.info(f"{raw_ocr}")
 
     try:
         ocr_res = [
@@ -156,76 +156,26 @@ def is_player_dead(frame: MatLike) -> bool:
     return any(KILL_FEED_TRIGGER in text for text in text_res)
 
 
-def detect_round_info(frame: MatLike) -> RoundInfo:
-    """Detects game state information from UI components.
+def detect_scores(frame: MatLike) -> Scores:
+    def extract_score(
+        roi: tuple[int, int, int, int],
+    ):
+        x1, y1, x2, y2 = roi
+        subframe = frame[y1:y2, x1:x2]
+        gray_roi = cv2.cvtColor(src=subframe, code=cv2.COLOR_BGR2GRAY)
+        # intialize easyOCR reader
+        reader = easyocr.Reader(
+            lang_list=["en"], gpu=torch.cuda.is_available()
+        )  # set gpu = True if have gpu
 
-    Extracts round number, remaining time, and current score from the top HUD area.
-    The function expects three OCR elements: team1_score, time, team2_score.
+        text_res = cast(list[str], reader.readtext(gray_roi, detail=0))
+        logger.info(f"{text_res=}")
 
-    Args:
-        frame (MatLike): Current frame capture of the gameplay in BGR format.
+        return int(text_res[0])
 
-    Returns:
-        tuple[int, int, str] | None: (current_round, round_time_seconds, score_string)
-        Returns None if detection fails or invalid HUD format detected.
-
-    Note:
-        - Detection region: (800, 18) to (1120, 80)
-        - Time format is converted from MM:SS or MM.SS to total seconds
-        - Current round calculated as: team1_score + team2_score + 1
-        - Score format: "team1_score - team2_score"
-    """
-
-    def fix_ocr_time_format(time_str: str) -> int:
-        """Converts a time string in 'minutes.seconds' format to total seconds.
-
-        Handles OCR misinterpretation where colons may be detected as dots.
-
-        Args:
-            time_str (str): Time string in format "MM:SS" or "MM.SS"
-
-        Returns:
-            int: Total time in seconds
-        """
-        # If the string contains a dot, try to treat it as a colon
-        if "." in time_str:
-            # Replace the dot with a colon to handle OCR misinterpretation
-            time_str = time_str.replace(".", ":", 1)
-
-        # split mins and secs
-        mins, secs = time_str.split(":")
-        mins = int(mins)
-        secs = int(secs)
-
-        return (mins * 60) + secs
-
-    # region of interest
-    x1, y1 = 800, 18  # top left
-    x2, y2 = 1120, 80  # bottom right
-    roi = frame[y1:y2, x1:x2]
-
-    gray_roi = cv2.cvtColor(src=roi, code=cv2.COLOR_BGR2GRAY)
-
-    # intialize easyOCR reader
-    reader = easyocr.Reader(
-        lang_list=["en"], gpu=torch.cuda.is_available()
-    )  # set gpu = True if have gpu
-
-    text_res = cast(list[str], reader.readtext(gray_roi, detail=0))
-    logger.info(f"easyocr reader found {text_res=}")
-
-    if len(text_res) != 3:
-        # TODO: make custom exception for hud_detection
-        raise ValueError(f"Error getting round_info information {len(text_res)}")
-
-    round_time = fix_ocr_time_format(time_str=text_res[1])
-    cur_round = int(text_res[0]) + int(text_res[2]) + 1
-    score = f"{text_res[0]} - {text_res[2]}"
-
-    return RoundInfo(
-        cur_round=cur_round,
-        round_time_sec=round_time,
-        score=score,
+    return Scores(
+        team1=extract_score(roi=(800, 30, 845, 70)),
+        team2=extract_score(roi=(1080, 30, 1125, 70)),
     )
 
 

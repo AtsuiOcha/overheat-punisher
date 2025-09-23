@@ -3,6 +3,7 @@ Overheat analysis module.
 Detects when monitored player takes unnecessary fights.
 """
 
+import time
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
@@ -26,7 +27,7 @@ class FrameState:
 
     frame: MatLike
     team_diff: int | None = None
-    round_time_sec: int = field(init=False)
+    timestamp_ms: int = field(default_factory=lambda: int(time.time() * 1000))
 
     def __post_init__(self):
         round_info = hud_detection.detect_round_info(frame=self.frame)
@@ -96,7 +97,7 @@ def check_overheat(
 
     death_traded = cur_frame_state.team_diff > death_frame_state.team_diff
     trade_window_expired = (
-        cur_frame_state.round_time_sec < death_frame_state.round_time_sec - 3
+        cur_frame_state.timestamp_ms - death_frame_state.timestamp_ms > 3000
     )
 
     if trade_window_expired:

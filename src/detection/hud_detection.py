@@ -82,8 +82,8 @@ def crop_patch(roi: MatLike, bbox: list[list[float]]) -> MatLike:
 
 def detect_kill_feed(frame: MatLike) -> list[KillFeedLine]:
     # region of interest
-    roi_x_min, roi_y_min = 1420, 90
-    roi_x_max, roi_y_max = 1900, 400
+    roi_x_min, roi_y_min = 1350, 90
+    roi_x_max, roi_y_max = 1900, 300
     roi_color = frame[roi_y_min:roi_y_max, roi_x_min:roi_x_max]
 
     # OCR works better on grayscale

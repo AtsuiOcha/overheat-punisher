@@ -30,9 +30,6 @@ class FrameState:
     timestamp_ms: int = field(default_factory=lambda: int(time.time() * 1000))
 
     def __post_init__(self):
-        round_info = hud_detection.detect_round_info(frame=self.frame)
-
-        self.round_time_sec = round_info["round_time_sec"]
         if self.team_diff is None:
             team1, team2 = hud_detection.detect_agent_icons(frame=self.frame)
             self.team_diff = len(team1) - len(team2)

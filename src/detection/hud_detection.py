@@ -102,6 +102,11 @@ def detect_kill_feed(frame: MatLike) -> list[KillFeedLine]:
             OcrResult(bbox=bbox, text=text, confidence=conf)
             for (bbox, text, conf) in raw_ocr
         ]
+        # sort by top-left y, then x
+        ocr_res.sort(
+            key=lambda r: (min(y for _, y in r.bbox), min(x for x, _ in r.bbox))
+        )
+
         if len(ocr_res) % 2 != 0:
             ocr_res = ocr_res[:-1]
     except ValidationError as val_err:

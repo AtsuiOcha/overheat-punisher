@@ -12,8 +12,6 @@ from loguru import logger
 
 from src.detection import hud_detection
 
-PLAYER_NAME = "malding"
-
 
 class AnalysisResult(Enum):
     OVERHEAT = auto()
@@ -69,9 +67,10 @@ def team_diff_at_death(
 def check_for_death_frame(
     prev_frame: MatLike,
     frame: MatLike,
+    player_name: str,
 ) -> FrameState | None:
     true_team_death = team_diff_at_death(
-        target_player=PLAYER_NAME,
+        target_player=player_name,
         prev_frame=prev_frame,
         cur_frame=frame,
     )

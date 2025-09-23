@@ -1,3 +1,4 @@
+import sys
 import threading
 
 from cv2.typing import MatLike
@@ -29,17 +30,23 @@ def loop():
                     player_name=player_name,
                 )
                 if death_frame_state is not None:
-                    print("[red]DEATH FRAME FOUND[/red]")
+                    print(f"[blue]DEATH FRAME FOUND: {death_frame_state} [/blue]")
             else:
-                anal_res = check_overheat(
-                    death_frame_state=death_frame_state,
-                    cur_frame_state=FrameState(cur_frame),
-                )
+                try:
+                    anal_res = check_overheat(
+                        death_frame_state=death_frame_state,
+                        cur_frame_state=FrameState(cur_frame),
+                    )
+                except Exception as exc:
+                    logger.error(f"{exc=}")
+                    sys.exit(0)
 
                 if anal_res == AnalysisResult.OVERHEAT:
                     print("[red]OVERHEAT MOTHAFUCKAAAAAA![/red]")
+                    sys.exit(0)
                 elif anal_res == AnalysisResult.SAFE_RESET:
                     death_frame_state = None
+                    print("[green]RESETTING![/green]")
 
         prev_frame = cur_frame
 

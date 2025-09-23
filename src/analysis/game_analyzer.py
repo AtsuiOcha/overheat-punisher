@@ -51,6 +51,7 @@ def team_diff_at_death(
     # death event reconstruction until we find score at player death
     kill_feed = hud_detection.detect_kill_feed(frame=cur_frame)
     team_diff_at_event = prev_team_diff
+    logger.info(f"death: {kill_feed=}")
 
     for feed_event in kill_feed:
         team_diff_at_event = (
@@ -69,15 +70,19 @@ def check_for_death_frame(
     frame: MatLike,
     player_name: str,
 ) -> FrameState | None:
-    true_team_death = team_diff_at_death(
+    if not hud_detection.is_player_dead(frame=frame):
+        return None
+
+    true_team_diff = team_diff_at_death(
         target_player=player_name,
         prev_frame=prev_frame,
         cur_frame=frame,
     )
+    logger.info(f"Player is dead, {true_team_diff=}")
 
     return (
-        FrameState(frame=frame, team_diff=true_team_death)
-        if hud_detection.is_player_dead(frame=frame) and true_team_death >= -1
+        FrameState(frame=frame, team_diff=true_team_diff)
+        if true_team_diff >= -1
         else None
     )
 
@@ -85,7 +90,7 @@ def check_for_death_frame(
 def check_overheat(
     death_frame_state: FrameState, cur_frame_state: FrameState
 ) -> AnalysisResult:
-    if not (cur_frame_state.team_diff and death_frame_state.team_diff):
+    if cur_frame_state.team_diff is None or death_frame_state.team_diff is None:
         logger.error(
             f"team_diffs found to be None {cur_frame_state=} {death_frame_state=}"
         )

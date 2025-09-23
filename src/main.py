@@ -1,19 +1,20 @@
+import sys
 import threading
 
-import keyboard
 from cv2.typing import MatLike
 from loguru import logger
+from rich import print
 
+from src.analysis import FrameState, check_for_death_frame, check_overheat
 from src.analysis.game_analyzer import AnalysisResult
-
-from .analysis import FrameState, check_for_death_frame, check_overheat
-from .capture import capture_screen
+from src.capture import capture_screen
 
 running = False
+player_name = ""
 
 
 def loop():
-    global running
+    global running, player_name
     death_frame_state: FrameState | None = None
     prev_frame: MatLike | None = None
     while running:
@@ -21,22 +22,31 @@ def loop():
         cur_frame = capture_screen()
 
         # ensure an intial frame has been read
-        if prev_frame:
+        if prev_frame is not None:
             if not death_frame_state:
                 death_frame_state = check_for_death_frame(
                     prev_frame=prev_frame,
                     frame=cur_frame,
+                    player_name=player_name,
                 )
+                if death_frame_state is not None:
+                    print(f"[blue]DEATH FRAME FOUND: {death_frame_state} [/blue]")
             else:
-                anal_res = check_overheat(
-                    death_frame_state=death_frame_state,
-                    cur_frame_state=FrameState(cur_frame),
-                )
+                try:
+                    anal_res = check_overheat(
+                        death_frame_state=death_frame_state,
+                        cur_frame_state=FrameState(cur_frame),
+                    )
+                except Exception as exc:
+                    logger.error(f"{exc=}")
+                    sys.exit(0)
 
                 if anal_res == AnalysisResult.OVERHEAT:
-                    ...  # notify
+                    print("[red]OVERHEAT MOTHAFUCKAAAAAA![/red]")
+                    sys.exit(0)
                 elif anal_res == AnalysisResult.SAFE_RESET:
                     death_frame_state = None
+                    print("[green]RESETTING![/green]")
 
         prev_frame = cur_frame
 
@@ -53,10 +63,37 @@ def toggle_loop():
 
 
 def main():
-    global running
-    print("Press F9 to toggle the loop on/off. Press press F10 to quit the program.")
-    _ = keyboard.add_hotkey("F9", toggle_loop)
-    keyboard.wait("F10")
+    global running, player_name
+
+    # Get player name from user
+    print("Welcome to Overheat Punisher!")
+    player_name = input("Enter your player name: ").strip()
+    if not player_name:
+        print("Player name cannot be empty. Exiting.")
+        return
+
+    print(f"Monitoring player: {player_name}")
+    print("Commands: 'start' to begin monitoring, 'stop' to pause, 'quit' to exit")
+
+    while True:
+        try:
+            command = input("> ").strip().lower()
+            if command in ["start", "s"]:
+                if not running:
+                    toggle_loop()
+                else:
+                    print("Already running")
+            elif command in ["stop", "p"]:
+                if running:
+                    toggle_loop()
+                else:
+                    print("Already stopped")
+            elif command in ["quit", "q", "exit"]:
+                break
+            else:
+                print("Commands: start, stop, quit")
+        except KeyboardInterrupt:
+            break
 
     # cleanly exit if loop is running
     if running:

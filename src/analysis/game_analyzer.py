@@ -3,6 +3,7 @@ Overheat analysis module.
 Detects when monitored player takes unnecessary fights.
 """
 
+import time
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
@@ -10,8 +11,6 @@ from cv2.typing import MatLike
 from loguru import logger
 
 from src.detection import hud_detection
-
-PLAYER_NAME = "malding"
 
 
 class AnalysisResult(Enum):
@@ -26,12 +25,9 @@ class FrameState:
 
     frame: MatLike
     team_diff: int | None = None
-    round_time_sec: int = field(init=False)
+    timestamp_ms: int = field(default_factory=lambda: int(time.time() * 1000))
 
     def __post_init__(self):
-        round_info = hud_detection.detect_round_info(frame=self.frame)
-
-        self.round_time_sec = round_info["round_time_sec"]
         if self.team_diff is None:
             team1, team2 = hud_detection.detect_agent_icons(frame=self.frame)
             self.team_diff = len(team1) - len(team2)
@@ -55,6 +51,7 @@ def team_diff_at_death(
     # death event reconstruction until we find score at player death
     kill_feed = hud_detection.detect_kill_feed(frame=cur_frame)
     team_diff_at_event = prev_team_diff
+    logger.info(f"death: {kill_feed=}")
 
     for feed_event in kill_feed:
         team_diff_at_event = (
@@ -71,16 +68,21 @@ def team_diff_at_death(
 def check_for_death_frame(
     prev_frame: MatLike,
     frame: MatLike,
+    player_name: str,
 ) -> FrameState | None:
-    true_team_death = team_diff_at_death(
-        target_player=PLAYER_NAME,
+    if not hud_detection.is_player_dead(frame=frame):
+        return None
+
+    true_team_diff = team_diff_at_death(
+        target_player=player_name,
         prev_frame=prev_frame,
         cur_frame=frame,
     )
+    logger.info(f"Player is dead, {true_team_diff=}")
 
     return (
-        FrameState(frame=frame, team_diff=true_team_death)
-        if hud_detection.is_player_dead(frame=frame) and true_team_death >= -1
+        FrameState(frame=frame, team_diff=true_team_diff)
+        if true_team_diff >= -1
         else None
     )
 
@@ -88,7 +90,7 @@ def check_for_death_frame(
 def check_overheat(
     death_frame_state: FrameState, cur_frame_state: FrameState
 ) -> AnalysisResult:
-    if not (cur_frame_state.team_diff and death_frame_state.team_diff):
+    if cur_frame_state.team_diff is None or death_frame_state.team_diff is None:
         logger.error(
             f"team_diffs found to be None {cur_frame_state=} {death_frame_state=}"
         )
@@ -96,7 +98,7 @@ def check_overheat(
 
     death_traded = cur_frame_state.team_diff > death_frame_state.team_diff
     trade_window_expired = (
-        cur_frame_state.round_time_sec < death_frame_state.round_time_sec - 3
+        cur_frame_state.timestamp_ms - death_frame_state.timestamp_ms > 3000
     )
 
     if trade_window_expired:

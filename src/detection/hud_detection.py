@@ -13,7 +13,7 @@ Constants:
 
 from enum import Enum
 from importlib.resources import files
-from typing import Any, TypedDict, cast
+from typing import Any, NamedTuple, TypedDict, cast
 
 import cv2
 import easyocr
@@ -31,7 +31,7 @@ KILL_FEED_TRIGGER = "KILLED BY"
 
 
 class OcrResult(BaseModel):
-    bbox: list[tuple[int, int]]
+    bbox: list[list[float]]
     text: str
     confidence: float
 
@@ -42,10 +42,9 @@ class KillFeedLine(TypedDict):
     was_team_death: bool
 
 
-class RoundInfo(TypedDict):
-    cur_round: int
-    round_time_sec: int
-    score: str
+class Scores(NamedTuple):
+    team1: int
+    team2: int
 
 
 class RoundState(Enum):
@@ -75,7 +74,7 @@ def classify_team_death_event(patch: MatLike) -> bool:
     return bool(red <= max(blue, green) * 1.2)
 
 
-def crop_patch(roi: MatLike, bbox: list[tuple[int, int]]) -> MatLike:
+def crop_patch(roi: MatLike, bbox: list[list[float]]) -> MatLike:
     xs = [p[0] for p in bbox]
     ys = [p[1] for p in bbox]
     return roi[int(min(ys)) : int(max(ys)), int(min(xs)) : int(max(xs))]
@@ -83,8 +82,8 @@ def crop_patch(roi: MatLike, bbox: list[tuple[int, int]]) -> MatLike:
 
 def detect_kill_feed(frame: MatLike) -> list[KillFeedLine]:
     # region of interest
-    roi_x_min, roi_y_min = 1420, 90
-    roi_x_max, roi_y_max = 1900, 400
+    roi_x_min, roi_y_min = 1350, 90
+    roi_x_max, roi_y_max = 1900, 300
     roi_color = frame[roi_y_min:roi_y_max, roi_x_min:roi_x_max]
 
     # OCR works better on grayscale
@@ -93,17 +92,25 @@ def detect_kill_feed(frame: MatLike) -> list[KillFeedLine]:
     # intialize easyOCR reader
     reader = easyocr.Reader(lang_list=["en"], gpu=torch.cuda.is_available())
 
-    raw_ocr = reader.readtext(image=gray_roi, detail=1)
+    raw_ocr = cast(
+        list[tuple[list[list[float]], str, float]],
+        reader.readtext(image=gray_roi, detail=1),
+    )
 
     try:
         ocr_res = [
             OcrResult(bbox=bbox, text=text, confidence=conf)
             for (bbox, text, conf) in raw_ocr
         ]
+        # sort by top-left y, then x
+        ocr_res.sort(
+            key=lambda r: (min(y for _, y in r.bbox), min(x for x, _ in r.bbox))
+        )
+
         if len(ocr_res) % 2 != 0:
             ocr_res = ocr_res[:-1]
     except ValidationError as val_err:
-        logger.error(f"OCR validation failed: {val_err=}")
+        logger.error(f"OCR validation failed: {val_err=}, {raw_ocr=}")
         raise
 
     return [
@@ -150,82 +157,32 @@ def is_player_dead(frame: MatLike) -> bool:
     reader = easyocr.Reader(lang_list=["en"], gpu=torch.cuda.is_available())
 
     text_res = cast(list[str], reader.readtext(image=gray_roi, detail=0))
-    logger.info(f"easyocr reader found {text_res=}")
+    logger.debug(f"easyocr reader found {text_res=}")
 
     # check for existance of 'KILLED BY'
     return any(KILL_FEED_TRIGGER in text for text in text_res)
 
 
-def detect_round_info(frame: MatLike) -> RoundInfo:
-    """Detects game state information from UI components.
+def detect_scores(frame: MatLike) -> Scores:
+    def extract_score(
+        roi: tuple[int, int, int, int],
+    ):
+        x1, y1, x2, y2 = roi
+        subframe = frame[y1:y2, x1:x2]
+        gray_roi = cv2.cvtColor(src=subframe, code=cv2.COLOR_BGR2GRAY)
+        # intialize easyOCR reader
+        reader = easyocr.Reader(
+            lang_list=["en"], gpu=torch.cuda.is_available()
+        )  # set gpu = True if have gpu
 
-    Extracts round number, remaining time, and current score from the top HUD area.
-    The function expects three OCR elements: team1_score, time, team2_score.
+        text_res = cast(list[str], reader.readtext(gray_roi, detail=0))
+        logger.debug(f"{text_res=}")
 
-    Args:
-        frame (MatLike): Current frame capture of the gameplay in BGR format.
+        return int(text_res[0])
 
-    Returns:
-        tuple[int, int, str] | None: (current_round, round_time_seconds, score_string)
-        Returns None if detection fails or invalid HUD format detected.
-
-    Note:
-        - Detection region: (800, 18) to (1120, 80)
-        - Time format is converted from MM:SS or MM.SS to total seconds
-        - Current round calculated as: team1_score + team2_score + 1
-        - Score format: "team1_score - team2_score"
-    """
-
-    def fix_ocr_time_format(time_str: str) -> int:
-        """Converts a time string in 'minutes.seconds' format to total seconds.
-
-        Handles OCR misinterpretation where colons may be detected as dots.
-
-        Args:
-            time_str (str): Time string in format "MM:SS" or "MM.SS"
-
-        Returns:
-            int: Total time in seconds
-        """
-        # If the string contains a dot, try to treat it as a colon
-        if "." in time_str:
-            # Replace the dot with a colon to handle OCR misinterpretation
-            time_str = time_str.replace(".", ":", 1)
-
-        # split mins and secs
-        mins, secs = time_str.split(":")
-        mins = int(mins)
-        secs = int(secs)
-
-        return (mins * 60) + secs
-
-    # region of interest
-    x1, y1 = 800, 18  # top left
-    x2, y2 = 1120, 80  # bottom right
-    roi = frame[y1:y2, x1:x2]
-
-    gray_roi = cv2.cvtColor(src=roi, code=cv2.COLOR_BGR2GRAY)
-
-    # intialize easyOCR reader
-    reader = easyocr.Reader(
-        lang_list=["en"], gpu=torch.cuda.is_available()
-    )  # set gpu = True if have gpu
-
-    text_res = cast(list[str], reader.readtext(gray_roi, detail=0))
-    logger.info(f"easyocr reader found {text_res=}")
-
-    if len(text_res) != 3:
-        # TODO: make custom exception for hud_detection
-        raise ValueError(f"Error getting round_info information {len(text_res)}")
-
-    round_time = fix_ocr_time_format(time_str=text_res[1])
-    cur_round = int(text_res[0]) + int(text_res[2]) + 1
-    score = f"{text_res[0]} - {text_res[2]}"
-
-    return RoundInfo(
-        cur_round=cur_round,
-        round_time_sec=round_time,
-        score=score,
+    return Scores(
+        team1=extract_score(roi=(800, 30, 845, 70)),
+        team2=extract_score(roi=(1080, 30, 1125, 70)),
     )
 
 
@@ -268,7 +225,7 @@ def detect_agent_icons(frame: MatLike) -> tuple[list[str], list[str]]:
         # handle empty ROI (dead agents)
         if np.var(roi) < VARIANCE_THRESHOLD:
             roi_str = f"Top-left({x1}, {y1}) Bottom-right({x2}, {y2})"
-            logger.info(f"variance: {np.var(roi)} is too low, empty ROI: {roi_str}")
+            logger.debug(f"variance: {np.var(roi)} is too low, empty ROI: {roi_str}")
             x1 += 65
             x2 += 65
             continue
@@ -322,7 +279,7 @@ def detect_agent_icons(frame: MatLike) -> tuple[list[str], list[str]]:
                         if max_val > ret_threshold:
                             ret_threshold = max_val
                             ret_agent = agent_name
-        logger.info(f"{ret_agent=} added to team1, with {ret_threshold=}")
+        logger.debug(f"{ret_agent=} added to team1, with {ret_threshold=}")
         team1_agents.append(ret_agent.lower())
         x1 += 65
         x2 += 65
@@ -339,7 +296,7 @@ def detect_agent_icons(frame: MatLike) -> tuple[list[str], list[str]]:
         # handle empty ROI (dead agents)
         if np.var(roi) < VARIANCE_THRESHOLD:
             roi_str = f"Top-left({x1}, {y1}) Bottom-right({x2}, {y2})"
-            logger.info(f"variance: {np.var(roi)} is too low, empty ROI: {roi_str}")
+            logger.debug(f"variance: {np.var(roi)} is too low, empty ROI: {roi_str}")
             x1 -= 65
             x2 -= 65
             continue
@@ -395,7 +352,7 @@ def detect_agent_icons(frame: MatLike) -> tuple[list[str], list[str]]:
                             ret_threshold = max_val
                             ret_agent = agent_name
 
-        logger.info(f"{ret_agent=} added to team2, with {ret_threshold=}")
+        logger.debug(f"{ret_agent=} added to team2, with {ret_threshold=}")
         team2_agents.append(ret_agent.lower())
         x1 -= 65
         x2 -= 65
@@ -418,7 +375,7 @@ def detect_round_state(frame: MatLike) -> RoundState:
     )  # set gpu = True if have gpu
 
     text_res = cast(list[str], reader.readtext(gray_roi, detail=0))
-    logger.info(f"easyocr reader found {text_res=}")
+    logger.debug(f"easyocr reader found {text_res=}")
 
     return next(
         (MATCH_MAP[word.lower()] for word in text_res if word.lower() in MATCH_MAP),

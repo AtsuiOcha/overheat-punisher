@@ -31,7 +31,7 @@ KILL_FEED_TRIGGER = "KILLED BY"
 
 
 class OcrResult(BaseModel):
-    bbox: list[tuple[float, float]]
+    bbox: list[list[float]]
     text: str
     confidence: float
 
@@ -74,7 +74,7 @@ def classify_team_death_event(patch: MatLike) -> bool:
     return bool(red <= max(blue, green) * 1.2)
 
 
-def crop_patch(roi: MatLike, bbox: list[tuple[int, int]]) -> MatLike:
+def crop_patch(roi: MatLike, bbox: list[list[float]]) -> MatLike:
     xs = [p[0] for p in bbox]
     ys = [p[1] for p in bbox]
     return roi[int(min(ys)) : int(max(ys)), int(min(xs)) : int(max(xs))]
@@ -92,8 +92,10 @@ def detect_kill_feed(frame: MatLike) -> list[KillFeedLine]:
     # intialize easyOCR reader
     reader = easyocr.Reader(lang_list=["en"], gpu=torch.cuda.is_available())
 
-    raw_ocr = reader.readtext(image=gray_roi, detail=1)
-    logger.info(f"{raw_ocr}")
+    raw_ocr = cast(
+        list[tuple[list[list[float]], str, float]],
+        reader.readtext(image=gray_roi, detail=1),
+    )
 
     try:
         ocr_res = [
@@ -103,7 +105,7 @@ def detect_kill_feed(frame: MatLike) -> list[KillFeedLine]:
         if len(ocr_res) % 2 != 0:
             ocr_res = ocr_res[:-1]
     except ValidationError as val_err:
-        logger.error(f"OCR validation failed: {val_err=}")
+        logger.error(f"OCR validation failed: {val_err=}, {raw_ocr=}")
         raise
 
     return [
@@ -150,7 +152,7 @@ def is_player_dead(frame: MatLike) -> bool:
     reader = easyocr.Reader(lang_list=["en"], gpu=torch.cuda.is_available())
 
     text_res = cast(list[str], reader.readtext(image=gray_roi, detail=0))
-    logger.info(f"easyocr reader found {text_res=}")
+    logger.debug(f"easyocr reader found {text_res=}")
 
     # check for existance of 'KILLED BY'
     return any(KILL_FEED_TRIGGER in text for text in text_res)
@@ -169,7 +171,7 @@ def detect_scores(frame: MatLike) -> Scores:
         )  # set gpu = True if have gpu
 
         text_res = cast(list[str], reader.readtext(gray_roi, detail=0))
-        logger.info(f"{text_res=}")
+        logger.debug(f"{text_res=}")
 
         return int(text_res[0])
 
@@ -218,7 +220,7 @@ def detect_agent_icons(frame: MatLike) -> tuple[list[str], list[str]]:
         # handle empty ROI (dead agents)
         if np.var(roi) < VARIANCE_THRESHOLD:
             roi_str = f"Top-left({x1}, {y1}) Bottom-right({x2}, {y2})"
-            logger.info(f"variance: {np.var(roi)} is too low, empty ROI: {roi_str}")
+            logger.debug(f"variance: {np.var(roi)} is too low, empty ROI: {roi_str}")
             x1 += 65
             x2 += 65
             continue
@@ -272,7 +274,7 @@ def detect_agent_icons(frame: MatLike) -> tuple[list[str], list[str]]:
                         if max_val > ret_threshold:
                             ret_threshold = max_val
                             ret_agent = agent_name
-        logger.info(f"{ret_agent=} added to team1, with {ret_threshold=}")
+        logger.debug(f"{ret_agent=} added to team1, with {ret_threshold=}")
         team1_agents.append(ret_agent.lower())
         x1 += 65
         x2 += 65
@@ -289,7 +291,7 @@ def detect_agent_icons(frame: MatLike) -> tuple[list[str], list[str]]:
         # handle empty ROI (dead agents)
         if np.var(roi) < VARIANCE_THRESHOLD:
             roi_str = f"Top-left({x1}, {y1}) Bottom-right({x2}, {y2})"
-            logger.info(f"variance: {np.var(roi)} is too low, empty ROI: {roi_str}")
+            logger.debug(f"variance: {np.var(roi)} is too low, empty ROI: {roi_str}")
             x1 -= 65
             x2 -= 65
             continue
@@ -345,7 +347,7 @@ def detect_agent_icons(frame: MatLike) -> tuple[list[str], list[str]]:
                             ret_threshold = max_val
                             ret_agent = agent_name
 
-        logger.info(f"{ret_agent=} added to team2, with {ret_threshold=}")
+        logger.debug(f"{ret_agent=} added to team2, with {ret_threshold=}")
         team2_agents.append(ret_agent.lower())
         x1 -= 65
         x2 -= 65
@@ -368,7 +370,7 @@ def detect_round_state(frame: MatLike) -> RoundState:
     )  # set gpu = True if have gpu
 
     text_res = cast(list[str], reader.readtext(gray_roi, detail=0))
-    logger.info(f"easyocr reader found {text_res=}")
+    logger.debug(f"easyocr reader found {text_res=}")
 
     return next(
         (MATCH_MAP[word.lower()] for word in text_res if word.lower() in MATCH_MAP),

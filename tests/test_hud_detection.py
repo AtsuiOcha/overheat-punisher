@@ -71,7 +71,7 @@ def test_check_killed_by_neg() -> None:
     assert not hud_detection.is_player_dead(frame)
 
 
-@pytest.mark.solo
+@pytest.mark.unit
 # test detect scores
 def test_detect_round_info() -> None:
     # load test image from assets folder

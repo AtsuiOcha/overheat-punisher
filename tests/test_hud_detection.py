@@ -1,3 +1,5 @@
+import time
+from collections.abc import Generator
 from importlib.resources import files
 from pprint import pprint
 
@@ -7,6 +9,13 @@ import pytest
 
 from src.assets import game_scenarios
 from src.detection import hud_detection
+
+
+@pytest.fixture(scope="module", autouse=True)
+def warm_reader() -> Generator[None, None, None]:
+    """Initialize reader once for all tests in module."""
+    hud_detection.get_reader()
+    yield
 
 
 # test detect kill feed when kill feed contains valid events
@@ -51,12 +60,14 @@ def test_check_killed_by_pos() -> None:
     if frame.shape[2] == 4:
         frame = cv2.cvtColor(src=frame, code=cv2.COLOR_BGRA2BGR)
 
+    start = time.perf_counter()
     assert hud_detection.is_player_dead(frame)
+    print(f"duration={time.perf_counter() - start}")
 
 
 @pytest.mark.unit
 # test check killed by exists negative test
-def test_check_killed_by_neg() -> None:
+def test_check_killed_by_neg(warm_reader: None) -> None:
     # load test image from assets folder
     test_img = files(game_scenarios).joinpath("mid_round.png")
 

@@ -7,7 +7,7 @@ from rich import print
 
 from src.analysis import FrameState, check_for_death_frame, check_overheat
 from src.analysis.game_analyzer import AnalysisResult
-from src.capture import capture_screen
+from src.capture import capture_screen, show_frame
 
 running = False
 player_name = ""
@@ -31,6 +31,10 @@ def loop():
                 )
                 if death_frame_state is not None:
                     print(f"[blue]DEATH FRAME FOUND: {death_frame_state} [/blue]")
+                    try:
+                        show_frame(frame=cur_frame)
+                    except Exception as cv_err:
+                        logger.error(f"{cv_err=}")
             else:
                 try:
                     anal_res = check_overheat(

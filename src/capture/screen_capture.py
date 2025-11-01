@@ -6,6 +6,8 @@ for Valorant gameplay analysis. Uses MSS (Multiple Screenshot System) for fast,
 cross-platform screen capture with OpenCV for image processing.
 """
 
+from datetime import datetime
+
 import cv2
 import mss
 import numpy as np
@@ -94,3 +96,45 @@ def show_screen_capture() -> None:
         except Exception:
             pass  # Ignore cleanup errors
         logger.info("Screen capture stopped and resources cleaned up")
+
+
+def save_debug_frame(frame: MatLike) -> str:
+    """Save a frame to disk for debugging inspection.
+
+    Args:
+        frame: The frame to save
+        filename: Optional filename, defaults to timestamped debug frame
+
+    Returns:
+        Path to the saved file
+    """
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
+    filename = f"debug_frame_{timestamp}.png"
+
+    # Save to /tmp directory
+    filepath = f"/tmp/{filename}"
+
+    cv2.imwrite(filepath, frame)
+    logger.info(f"Debug frame saved to: {filepath}")
+    return filepath
+
+
+def show_frame(frame: MatLike, window_name: str = "DEBUG FRAME") -> None:
+    """Display a frame for debugging. Falls back to saving file if display fails.
+
+    Args:
+        frame: The frame to display
+        window_name: Name of the display window
+    """
+    try:
+        # Try the simple approach first - just like show_screen_capture does
+        cv2.imshow(winname=window_name, mat=frame)
+        cv2.waitKey(0)
+        cv2.destroyWindow(window_name)
+
+    except Exception as e:
+        logger.warning(f"Display failed: {e}")
+        # Fallback: save to file
+        filepath = save_debug_frame(frame)
+        logger.info(f"Frame saved for inspection: {filepath}")

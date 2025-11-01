@@ -12,6 +12,7 @@ Constants:
 """
 
 from enum import Enum
+from functools import lru_cache
 from importlib.resources import files
 from typing import Any, NamedTuple, TypedDict, cast
 
@@ -22,6 +23,7 @@ import torch
 from cv2.typing import MatLike
 from loguru import logger
 from pydantic import BaseModel, ValidationError
+from rapidfuzz import fuzz
 
 import src.assets.agent_icons_clean as icons
 
@@ -90,7 +92,7 @@ def detect_kill_feed(frame: MatLike) -> list[KillFeedLine]:
     gray_roi = cv2.cvtColor(src=roi_color, code=cv2.COLOR_BGR2GRAY)
 
     # intialize easyOCR reader
-    reader = easyocr.Reader(lang_list=["en"], gpu=torch.cuda.is_available())
+    reader = get_reader()
 
     raw_ocr = cast(
         list[tuple[list[list[float]], str, float]],
@@ -148,19 +150,21 @@ def is_player_dead(frame: MatLike) -> bool:
     """
     # region of interest
     x1, y1 = 1420, 220  # top left
-    x2, y2 = 1900, 800  # bottom right
+    x2, y2 = 1900, 400  # bottom right
     roi = frame[y1:y2, x1:x2]
 
     gray_roi = cv2.cvtColor(src=roi, code=cv2.COLOR_BGR2GRAY)
 
     # intialize easyOCR reader
-    reader = easyocr.Reader(lang_list=["en"], gpu=torch.cuda.is_available())
+    reader = get_reader()
 
     text_res = cast(list[str], reader.readtext(image=gray_roi, detail=0))
     logger.debug(f"easyocr reader found {text_res=}")
 
     # check for existance of 'KILLED BY'
-    return any(KILL_FEED_TRIGGER in text for text in text_res)
+    return any(
+        fuzz.partial_ratio(text.upper(), KILL_FEED_TRIGGER) >= 95 for text in text_res
+    )
 
 
 def detect_scores(frame: MatLike) -> Scores:
@@ -170,10 +174,9 @@ def detect_scores(frame: MatLike) -> Scores:
         x1, y1, x2, y2 = roi
         subframe = frame[y1:y2, x1:x2]
         gray_roi = cv2.cvtColor(src=subframe, code=cv2.COLOR_BGR2GRAY)
+
         # intialize easyOCR reader
-        reader = easyocr.Reader(
-            lang_list=["en"], gpu=torch.cuda.is_available()
-        )  # set gpu = True if have gpu
+        reader = get_reader()
 
         text_res = cast(list[str], reader.readtext(gray_roi, detail=0))
         logger.debug(f"{text_res=}")
@@ -370,9 +373,7 @@ def detect_round_state(frame: MatLike) -> RoundState:
     gray_roi = cv2.cvtColor(src=roi, code=cv2.COLOR_BGR2GRAY)
 
     # intialize easyOCR reader
-    reader = easyocr.Reader(
-        lang_list=["en"], gpu=torch.cuda.is_available()
-    )  # set gpu = True if have gpu
+    reader = get_reader()
 
     text_res = cast(list[str], reader.readtext(gray_roi, detail=0))
     logger.debug(f"easyocr reader found {text_res=}")
@@ -381,3 +382,9 @@ def detect_round_state(frame: MatLike) -> RoundState:
         (MATCH_MAP[word.lower()] for word in text_res if word.lower() in MATCH_MAP),
         RoundState.MID_ROUND,
     )
+
+
+@lru_cache(maxsize=1)
+def get_reader() -> easyocr.Reader:
+    """Returns a cached EasyOCR reader instance."""
+    return easyocr.Reader(lang_list=["en"], gpu=torch.cuda.is_available())

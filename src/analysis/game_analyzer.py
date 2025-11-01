@@ -9,6 +9,7 @@ from enum import Enum, auto
 
 from cv2.typing import MatLike
 from loguru import logger
+from rapidfuzz import fuzz
 
 from src.detection import hud_detection
 
@@ -59,7 +60,13 @@ def team_diff_at_death(
             if feed_event["was_team_death"]
             else team_diff_at_event + 1
         )
-        if feed_event["victim"].lower() == target_player.lower():
+        # Use fuzzy matching to handle OCR inaccuracies
+        similarity = fuzz.ratio(feed_event["victim"].lower(), target_player.lower())
+        logger.debug(
+            f"{feed_event['victim'].lower()=} and {target_player.lower()=} have {similarity=}"
+        )
+        # TODO: magic number??
+        if similarity >= 90:
             return team_diff_at_event
 
     return team_diff_at_event
